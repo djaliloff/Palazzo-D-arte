@@ -1,13 +1,23 @@
-const express = require('express');
+import express from "express";
+import { PrismaClient } from "@prisma/client";
+
+
+
 const app = express();
-const PORT = 3000;
+const prisma = new PrismaClient();
+app.use(express.json());
 
-// Route principale
-app.get('/', (req, res) => {
-  res.send('Bienvenue sur mon serveur Express 🚀');
+// Create user
+app.post("/users", async (req, res) => {
+  const { name, email} = req.body;
+  const user = await prisma.user.create({ data: { name, email} });
+  res.json(user);
 });
 
-// Démarrage du serveur
-app.listen(PORT, () => {
-  console.log(`✅ Serveur Express en marche sur http://localhost:${PORT}`);
+// Get all users
+app.get("/users", async (req, res) => {
+  const users = await prisma.user.findMany();
+  res.json(users);
 });
+
+app.listen(3000, () => console.log("🚀 Server running on http://localhost:3000"));
