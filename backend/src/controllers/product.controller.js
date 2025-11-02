@@ -7,7 +7,7 @@ import { asyncHandler } from '../middlewares/error.middleware.js';
  * GET /api/products
  */
 export const getAllProducts = asyncHandler(async (req, res) => {
-  const { search, marqueId, categorieId, actif } = req.query;
+  const { search, marqueId, categorieId, actif, page, limit } = req.query;
 
   const where = {
     deleted: false
@@ -33,16 +33,35 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     where.actif = actif === 'true';
   }
 
+  // Pagination
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 20;
+  const skip = (pageNum - 1) * limitNum;
+
+  // Get total count for pagination
+  const total = await prisma.produit.count({ where });
+
   const produits = await prisma.produit.findMany({
     where,
     include: {
       marque: true,
       categorie: true
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    skip,
+    take: limitNum
   });
 
-  res.json(produits);
+  res.json({
+    products: produits,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum),
+      hasMore: skip + produits.length < total
+    }
+  });
 });
 
 /**
@@ -90,16 +109,79 @@ export const createProduct = asyncHandler(async (req, res) => {
     venduParUnite
   } = req.body;
 
-  if (!reference || !nom || !prixUnitaire || !marqueId || !categorieId) {
+  if (!nom || !prixUnitaire || !marqueId || !categorieId) {
     return res.status(400).json({
       error: 'Validation Error',
-      message: 'Reference, name, unit price, brand and category are required'
+      message: 'Name, unit price, brand and category are required'
     });
+  }
+
+  // Generate unique reference if not provided
+  let productReference = reference;
+  if (!productReference) {
+    // Find all products with references starting with 'P-'
+    const productsWithP = await prisma.produit.findMany({
+      where: {
+        reference: {
+          startsWith: 'P-',
+          mode: 'insensitive'
+        }
+      },
+      select: {
+        reference: true
+      },
+      orderBy: {
+        reference: 'desc'
+      }
+    });
+
+    let nextNumber = 1;
+    if (productsWithP && productsWithP.length > 0) {
+      // Extract the highest number from references
+      const numbers = productsWithP
+        .map(p => {
+          const match = p.reference.match(/P-(\d+)/);
+          return match ? parseInt(match[1]) : 0;
+        })
+        .filter(n => n > 0);
+      
+      if (numbers.length > 0) {
+        nextNumber = Math.max(...numbers) + 1;
+      }
+    }
+
+    // Format as P-001, P-002, etc.
+    productReference = `P-${String(nextNumber).padStart(3, '0')}`;
+    
+    // Ensure uniqueness (in case of race condition)
+    let exists = await prisma.produit.findUnique({
+      where: { reference: productReference }
+    });
+    
+    while (exists) {
+      nextNumber++;
+      productReference = `P-${String(nextNumber).padStart(3, '0')}`;
+      exists = await prisma.produit.findUnique({
+        where: { reference: productReference }
+      });
+    }
+  } else {
+    // Check if provided reference already exists
+    const existingProduct = await prisma.produit.findUnique({
+      where: { reference: productReference }
+    });
+    
+    if (existingProduct) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Reference already exists'
+      });
+    }
   }
 
   const produit = await prisma.produit.create({
     data: {
-      reference,
+      reference: productReference,
       nom,
       description,
       image,
@@ -112,7 +194,6 @@ export const createProduct = asyncHandler(async (req, res) => {
       seuilAlerte: seuilAlerte || 5,
       quantite_stock: parseFloat(req.body.quantite_stock) || 0,
       quantite_depos: parseFloat(req.body.quantite_depos) || 0,
-      date_expiration: req.body.date_expiration ? new Date(req.body.date_expiration) : null,
       venduParUnite: venduParUnite !== undefined ? venduParUnite : true
     },
     include: {
@@ -246,9 +327,15 @@ export const addStockToProduct = asyncHandler(async (req, res) => {
     quantite_depos: newQuantiteDepos
   };
 
-  // Update expiration date if provided
-  if (date_expiration) {
-    updateData.date_expiration = new Date(date_expiration);
+  // Create LotDeStock if date_expiration is provided and stock is being added
+  if (date_expiration && quantite_stock_ajout) {
+    await prisma.lotDeStock.create({
+      data: {
+        produitId: parseInt(produitId),
+        quantite: parseFloat(quantite_stock_ajout),
+        date_expiration: new Date(date_expiration)
+      }
+    });
   }
 
   const updatedProduit = await prisma.produit.update({

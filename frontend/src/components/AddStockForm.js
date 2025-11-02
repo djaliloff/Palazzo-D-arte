@@ -19,9 +19,11 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
   const fetchProducts = async () => {
     try {
       const response = await api.get('/products', {
-        params: { actif: 'true' }
+        params: { actif: 'true', limit: 1000 }
       });
-      setProducts(response.data.filter(p => !p.deleted));
+      // Handle both old format (array) and new format (object with products)
+      const productsList = response.data.products || response.data;
+      setProducts(productsList.filter(p => !p.deleted));
     } catch (err) {
       console.error('Failed to load products:', err);
     }

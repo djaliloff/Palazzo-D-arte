@@ -16,20 +16,15 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     if (endDate) dateFilter.dateAchat.lte = new Date(endDate);
   }
 
-  // Total sales
+  // Total sales (prix_total_remise après remises)
   const totalSales = await prisma.achat.aggregate({
     where: dateFilter,
     _sum: {
-      prix_total: true
+      prix_total_remise: true
     }
   });
 
-  // Total purchases
-  const totalPurchases = await prisma.achat.count({
-    where: dateFilter
-  });
-
-  // Total returns
+  // Calculate total returns for the same period
   const totalReturns = await prisma.retour.aggregate({
     where: {
       dateRetour: dateFilter.dateAchat || undefined
@@ -38,6 +33,15 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       montantRembourse: true
     }
   });
+
+  // Net sales (sales - returns)
+  const netSales = (totalSales._sum.prix_total_remise || 0) - (totalReturns._sum.montantRembourse || 0);
+
+  // Total purchases
+  const totalPurchases = await prisma.achat.count({
+    where: dateFilter
+  });
+
 
   // Active clients
   const activeClients = await prisma.client.count({
@@ -70,28 +74,78 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     }
   });
 
-  // Sales by day
+  // Sales by day (using prix_total_remise)
   const salesByDay = await prisma.achat.groupBy({
     by: ['dateAchat'],
     where: dateFilter,
     _sum: {
-      prix_total: true
+      prix_total_remise: true
+    },
+    _count: {
+      id: true
     },
     orderBy: {
       dateAchat: 'asc'
     }
   });
 
+  // Get returns by day
+  const returnsByDay = await prisma.retour.groupBy({
+    by: ['dateRetour'],
+    where: {
+      dateRetour: dateFilter.dateAchat || undefined
+    },
+    _sum: {
+      montantRembourse: true
+    },
+    _count: {
+      id: true
+    },
+    orderBy: {
+      dateRetour: 'asc'
+    }
+  });
+
+  // Combine sales and returns by day
+  const salesByDayMap = new Map();
+  salesByDay.forEach(item => {
+    const dateKey = new Date(item.dateAchat).toISOString().split('T')[0];
+    salesByDayMap.set(dateKey, {
+      date: item.dateAchat,
+      sales: item._sum.prix_total_remise || 0,
+      count: item._count.id || 0,
+      returns: 0
+    });
+  });
+
+  returnsByDay.forEach(item => {
+    const dateKey = new Date(item.dateRetour).toISOString().split('T')[0];
+    if (salesByDayMap.has(dateKey)) {
+      salesByDayMap.get(dateKey).returns = item._sum.montantRembourse || 0;
+    } else {
+      salesByDayMap.set(dateKey, {
+        date: item.dateRetour,
+        sales: 0,
+        count: 0,
+        returns: item._sum.montantRembourse || 0
+      });
+    }
+  });
+
   res.json({
-    totalSales: totalSales._sum.prix_total || 0,
+    totalSales: totalSales._sum.prix_total_remise || 0,
+    netSales,
     totalPurchases,
     totalReturns: totalReturns._sum.montantRembourse || 0,
     activeClients,
     lowStockCount,
     recentPurchases,
-    salesByDay: salesByDay.map(item => ({
-      date: item.dateAchat,
-      total: item._sum.prix_total || 0
+    salesByDay: Array.from(salesByDayMap.values()).map(item => ({
+      date: item.date,
+      sales: item.sales,
+      returns: item.returns,
+      net: item.sales - item.returns,
+      count: item.count
     }))
   });
 });
@@ -185,21 +239,38 @@ export const getSalesStats = asyncHandler(async (req, res) => {
     return res.json(Object.values(categoryMap));
   }
 
+  // Get total returns for the period
+  const returnsStats = await prisma.retour.aggregate({
+    where: {
+      dateRetour: dateFilter.dateAchat || undefined
+    },
+    _sum: {
+      montantRembourse: true
+    },
+    _count: {
+      id: true
+    }
+  });
+
   // Default: return basic stats
   const stats = {
     totalAmount: await prisma.achat.aggregate({
       where: dateFilter,
-      _sum: { prix_total: true }
+      _sum: { prix_total_remise: true }
     }),
     totalCount: await prisma.achat.count({
       where: dateFilter
     }),
-    averageAmount: 0
+    averageAmount: 0,
+    totalReturns: returnsStats._sum.montantRembourse || 0,
+    returnsCount: returnsStats._count.id || 0
   };
 
   if (stats.totalCount > 0) {
-    stats.averageAmount = (stats.totalAmount._sum.prix_total || 0) / stats.totalCount;
+    stats.averageAmount = (stats.totalAmount._sum.prix_total_remise || 0) / stats.totalCount;
   }
+
+  stats.netSales = (stats.totalAmount._sum.prix_total_remise || 0) - (stats.totalReturns || 0);
 
   res.json(stats);
 });

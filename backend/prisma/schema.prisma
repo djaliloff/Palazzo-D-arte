@@ -143,12 +143,23 @@ model Produit {
   
   ligneAchats             LigneAchat[]
   ligneRetours            LigneRetour[]
-  //lot de stock 
-  date_expiration         DateTime?
+  lot_de_stock            LotDeStock[]
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @updatedAt
 
   @@map("produits")
+}
+
+model LotDeStock {
+  id          Int      @id @default(autoincrement())
+  produitId   Int
+  quantite    Float
+  date_expiration DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  produit             Produit     @relation(fields: [produitId], references: [id])
+
 }
 
 // ============================================
@@ -167,7 +178,7 @@ model Achat {
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  // versment        Float
+  versment        Float    @default(0)
 
   client          Client      @relation(fields: [clientId], references: [id])
   utilisateur     Utilisateur @relation(fields: [utilisateurId], references: [id])

@@ -255,12 +255,21 @@ export const createRetour = asyncHandler(async (req, res) => {
 
   // Update stock and quantiteRetournee
   for (const item of produitsToUpdate) {
+    // Si le produit a un poids défini et que l'unité de mesure est KG,
+    // convertir les kg retournés en fraction de pièce pour la restauration du stock
+    let quantiteToIncrement = item.quantite;
+    if (item.produit.poids && item.produit.uniteMesure === 'KG' && item.produit.venduParUnite) {
+      // Convertir les kg retournés en fraction de pièce
+      // Par exemple: 2 kg / 10 kg = 0.2 pièce
+      quantiteToIncrement = item.quantite / item.produit.poids;
+    }
+
     // Restore stock
     await prisma.produit.update({
       where: { id: item.produit.id },
       data: {
         quantite_stock: {
-          increment: item.quantite
+          increment: quantiteToIncrement
         }
       }
     });

@@ -108,6 +108,23 @@ const AchatList = () => {
     }
   };
 
+  // Calculer le montant total des retours pour un achat
+  const calculateTotalReturns = (achat) => {
+    if (!achat.retours || achat.retours.length === 0) {
+      return 0;
+    }
+    return achat.retours.reduce((total, retour) => {
+      return total + (parseFloat(retour.montantRembourse) || 0);
+    }, 0);
+  };
+
+  // Calculer le prix réel (après retours)
+  const calculateRealPrice = (achat) => {
+    const totalReturns = calculateTotalReturns(achat);
+    const prixInitial = parseFloat(achat.prix_total_remise || 0);
+    return Math.max(0, prixInitial - totalReturns);
+  };
+
   if (loading) return (
     <div style={{ 
       textAlign: 'center', 
@@ -515,15 +532,42 @@ const AchatList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedAchat.ligneAchats?.map((ligne, idx) => (
+                    {selectedAchat.ligneAchats?.map((ligne, idx) => {
+                      const quantiteRetournee = parseFloat(ligne.quantiteRetournee || 0);
+                      const montantRetourne = quantiteRetournee > 0 ? quantiteRetournee * parseFloat(ligne.prixUnitaire) : 0;
+                      const sousTotalReel = parseFloat(ligne.sousTotal) - montantRetourne;
+                      const hasReturn = quantiteRetournee > 0;
+                      
+                      return (
                       <tr key={idx} style={{ 
-                        borderBottom: '1px solid #eee'
+                          borderBottom: '1px solid #eee',
+                          background: hasReturn ? '#fff5f5' : 'transparent'
                       }}>
                         <td style={{ padding: '0.75rem', color: '#333' }}>
                           {ligne.produit?.nom || 'N/A'}
+                            {hasReturn && (
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#ef4444',
+                                marginTop: '0.25rem'
+                              }}>
+                                ⚠️ Retourné: {quantiteRetournee} {ligne.produit?.uniteMesure || ''}
+                              </div>
+                            )}
                         </td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', color: '#333' }}>
+                            <div>
                           {ligne.quantite} {ligne.produit?.uniteMesure || ''}
+                            </div>
+                            {hasReturn && (
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#ef4444',
+                                marginTop: '0.25rem'
+                              }}>
+                                ({ligne.quantite - quantiteRetournee} restant)
+                              </div>
+                            )}
                         </td>
                         <td style={{ padding: '0.75rem', textAlign: 'right', color: '#666' }}>
                           {parseFloat(ligne.prixUnitaire).toFixed(2)} DA
@@ -532,10 +576,24 @@ const AchatList = () => {
                           {parseFloat(ligne.remise || 0).toFixed(2)} DA
                         </td>
                         <td style={{ padding: '0.75rem', textAlign: 'right', color: '#333', fontWeight: 500 }}>
-                          {parseFloat(ligne.sousTotal).toFixed(2)} DA
+                            <div>
+                              {sousTotalReel.toFixed(2)} DA
+                            </div>
+                            {hasReturn && (
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#ef4444',
+                                marginTop: '0.25rem',
+                                textDecoration: 'line-through',
+                                opacity: 0.7
+                              }}>
+                                ({parseFloat(ligne.sousTotal).toFixed(2)} initial)
+                              </div>
+                            )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -565,21 +623,81 @@ const AchatList = () => {
                   {parseFloat(selectedAchat.remiseGlobale || 0).toFixed(2)} DA
                 </div>
               </div>
+              {calculateTotalReturns(selectedAchat) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ddd' }}>
+                  <div style={{ color: '#ef4444' }}>
+                    <strong>Retours:</strong>
+                  </div>
+                  <div style={{ color: '#ef4444', fontWeight: 500 }}>
+                    - {calculateTotalReturns(selectedAchat).toFixed(2)} DA
+                  </div>
+                </div>
+              )}
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'space-between',
                 paddingTop: '0.5rem',
-                borderTop: '1px solid #ddd',
+                borderTop: '2px solid #ddd',
                 marginTop: '0.5rem'
               }}>
                 <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#667eea' }}>
-                  <strong>Total:</strong>
+                  <strong>Total {calculateTotalReturns(selectedAchat) > 0 ? '(après retours)' : ''}:</strong>
                 </div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#667eea' }}>
-                  {parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA
+                  {calculateRealPrice(selectedAchat).toFixed(2)} DA
+                  {calculateTotalReturns(selectedAchat) > 0 && (
+                    <div style={{ 
+                      fontSize: '0.85rem', 
+                      color: '#ef4444',
+                      marginTop: '0.25rem',
+                      textDecoration: 'line-through',
+                      opacity: 0.7,
+                      fontWeight: 'normal'
+                    }}>
+                      (Initial: {parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA)
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
+
+            {selectedAchat.retours && selectedAchat.retours.length > 0 && (
+              <div style={{ 
+                marginTop: '1.5rem', 
+                paddingTop: '1rem', 
+                borderTop: '2px solid #ddd'
+              }}>
+                <strong style={{ marginBottom: '1rem', display: 'block', color: '#ef4444' }}>
+                  Retours ({selectedAchat.retours.length}):
+                </strong>
+                {selectedAchat.retours.map((retour, idx) => (
+                  <div key={idx} style={{
+                    marginBottom: '1rem',
+                    padding: '1rem',
+                    background: '#fff5f5',
+                    borderRadius: '8px',
+                    border: '1px solid #fecaca'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <div style={{ fontWeight: 600, color: '#333' }}>
+                        {retour.numeroRetour}
+                      </div>
+                      <div style={{ fontWeight: 600, color: '#ef4444' }}>
+                        {parseFloat(retour.montantRembourse || 0).toFixed(2)} DA
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                      Type: {retour.typeRetour} | Date: {new Date(retour.dateRetour).toLocaleDateString()}
+                    </div>
+                    {retour.motif && (
+                      <div style={{ fontSize: '0.85rem', color: '#666', fontStyle: 'italic' }}>
+                        Motif: {retour.motif}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {selectedAchat.notes && (
               <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
@@ -1012,7 +1130,18 @@ const AchatList = () => {
                         fontSize: '0.95rem',
                         color: '#667eea'
                       }}>
-                        {parseFloat(achat.prix_total_remise).toFixed(2)} DA
+                        {calculateRealPrice(achat).toFixed(2)} DA
+                        {calculateTotalReturns(achat) > 0 && (
+                          <div style={{ 
+                            fontSize: '0.75rem', 
+                            color: '#ef4444',
+                            marginTop: '0.25rem',
+                            textDecoration: 'line-through',
+                            opacity: 0.7
+                          }}>
+                            (Initial: {parseFloat(achat.prix_total_remise).toFixed(2)} DA)
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '1rem', color: '#6b7280' }}>
                         {new Date(achat.dateAchat).toLocaleDateString()}

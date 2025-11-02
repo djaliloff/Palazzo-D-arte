@@ -1,7 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart }) => {
+// Fonction utilitaire pour formater l'affichage du stock
+const formatStockDisplay = (product) => {
+  // Si le produit a un poids défini et que l'unité de mesure est KG
+  if (product.poids && product.uniteMesure === 'KG' && product.venduParUnite) {
+    const quantiteStock = parseFloat(product.quantite_stock) || 0;
+    const piecesCompletes = Math.floor(quantiteStock);
+    const resteEnKg = (quantiteStock - piecesCompletes) * product.poids;
+    
+    if (resteEnKg > 0 && piecesCompletes > 0) {
+      return `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''} et ${resteEnKg.toFixed(2)} kg`;
+    } else if (piecesCompletes > 0) {
+      return `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''}`;
+    } else if (resteEnKg > 0) {
+      return `${resteEnKg.toFixed(2)} kg`;
+    }
+  }
+  
+  // Affichage par défaut
+  return `${product.quantite_stock} ${product.uniteMesure}`;
+};
+
+const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullProduct }) => {
   const defaultQty = product.venduParUnite ? '0.01' : '1';
   const [quantityInput, setQuantityInput] = useState(cartItem ? cartItem.quantite : defaultQty);
 
@@ -37,16 +58,41 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart }) => {
     }
   };
 
+  const handleBuyFullProduct = () => {
+    if (onAddFullProduct && product.poids && product.prixTotal) {
+      onAddFullProduct(product.poids, product.prixTotal);
+    }
+  };
+
   const minValue = product.venduParUnite ? 0.01 : 1;
   const stepValue = product.venduParUnite ? 0.01 : 1;
+  // Le bouton "Acheter la totalité" est affiché si :
+  // - Le produit est fractionnable (venduParUnite)
+  // - Le produit a un poids défini (paquet complet)
+  // - Le produit a un prixTotal défini
+  // - Il y a au moins une pièce complète disponible (quantite_stock >= 1)
+  const canBuyFull = product.venduParUnite && product.poids && product.prixTotal && product.quantite_stock >= 1;
 
   return (
     <div style={{
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      padding: '1rem',
-      background: 'white'
-    }}>
+      border: '2px solid #e5e7eb',
+      borderRadius: '12px',
+      padding: '1.25rem',
+      background: 'white',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+      transition: 'all 0.2s ease'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.borderColor = '#667eea';
+      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.15)';
+      e.currentTarget.style.transform = 'translateY(-2px)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.borderColor = '#e5e7eb';
+      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+      e.currentTarget.style.transform = 'translateY(0)';
+    }}
+    >
       {product.image && (
         <img
           src={product.image}
@@ -64,14 +110,102 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart }) => {
           }}
         />
       )}
-      <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>{product.nom}</div>
-      <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
-        {product.reference} | Stock: {product.quantite_stock} {product.uniteMesure}
+      <div style={{ 
+        fontWeight: 600, 
+        marginBottom: '0.5rem', 
+        fontSize: '1rem', 
+        color: '#1f2937',
+        lineHeight: '1.4'
+      }}>
+        {product.nom}
       </div>
-      <div style={{ fontWeight: 'bold', color: '#667eea', marginBottom: '0.5rem' }}>
-        {product.prixUnitaire} DA
+      <div style={{ 
+        fontSize: '0.85rem', 
+        color: '#6b7280', 
+        marginBottom: '0.75rem',
+        lineHeight: '1.5'
+      }}>
+        <div style={{ marginBottom: '0.25rem' }}>
+          <strong>Reference:</strong> {product.reference} | <strong>Stock:</strong> {formatStockDisplay(product)}
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        {product.poids && (
+          <div style={{ 
+            marginTop: '0.5rem', 
+            padding: '0.5rem',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderRadius: '6px',
+            fontWeight: 600,
+            fontSize: '0.875rem'
+          }}>
+            📦 Paquet: {product.poids} {product.uniteMesure} - {product.prixTotal} DA
+          </div>
+        )}
+      </div>
+      <div style={{ 
+        fontWeight: 700, 
+        color: '#667eea', 
+        marginBottom: '0.75rem',
+        fontSize: '1.1rem',
+        padding: '0.5rem',
+        background: '#f3f4f6',
+        borderRadius: '6px',
+        textAlign: 'center'
+      }}>
+        💰 {product.prixUnitaire} DA / {product.uniteMesure}
+      </div>
+      
+      {/* Bouton pour acheter la totalité du produit */}
+      {canBuyFull && (
+        <button
+          type="button"
+          onClick={handleBuyFullProduct}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            marginBottom: '0.75rem',
+            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+          }}
+        >
+          🛒 Acheter la totalité ({product.poids} {product.uniteMesure} - {product.prixTotal} DA)
+        </button>
+      )}
+
+      {/* Section pour acheter par quantité spécifiée */}
+      <div style={{ 
+        padding: '0.75rem',
+        background: canBuyFull ? '#f8f9fa' : 'transparent',
+        borderRadius: '6px',
+        border: canBuyFull ? '1px solid #e9ecef' : 'none'
+      }}>
+        {canBuyFull && (
+          <div style={{ 
+            fontSize: '0.75rem', 
+            color: '#666', 
+            marginBottom: '0.5rem',
+            fontWeight: 500,
+            textAlign: 'center'
+          }}>
+            Ou acheter par {product.uniteMesure.toLowerCase()}:
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
         <input
           type="number"
           value={quantityInput}
@@ -82,26 +216,50 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart }) => {
           placeholder="Qty"
           style={{
             flex: 1,
-            padding: '0.5rem',
-            border: '1px solid #ddd',
-            borderRadius: '4px'
+              padding: '0.75rem',
+              border: '2px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#667eea';
+              e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#e5e7eb';
+              e.target.style.boxShadow = 'none';
           }}
         />
         <button
           type="button"
           onClick={handleAddToCartClick}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(102, 126, 234, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.2)';
+            }}
           style={{
-            padding: '0.5rem 1rem',
-            background: cartItem ? '#4CAF50' : '#667eea',
+              padding: '0.75rem 1.25rem',
+              background: cartItem ? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
+              borderRadius: '8px',
             cursor: 'pointer',
-            fontSize: '0.85rem'
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 4px rgba(102, 126, 234, 0.2)',
+              whiteSpace: 'nowrap'
           }}
         >
-          {cartItem ? 'Update' : 'Add to Cart'}
+            {cartItem ? '✓ Update' : '+ Add'}
         </button>
+        </div>
       </div>
     </div>
   );
@@ -125,7 +283,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
   const [cart, setCart] = useState([]);
   const [formData, setFormData] = useState({
     remiseGlobale: '0',
-    notes: ''
+    versment: '0'
   });
   const [newClientData, setNewClientData] = useState({
     nom: '',
@@ -160,8 +318,10 @@ const AchatForm = ({ onSuccess, onCancel }) => {
 
   const fetchProducts = async () => {
     try {
-      const response = await api.get('/products', { params: { actif: 'true' } });
-      setProducts(response.data.filter(p => !p.deleted && p.quantite_stock > 0));
+      const response = await api.get('/products', { params: { actif: 'true', limit: 1000 } });
+      // Handle both old format (array) and new format (object with products)
+      const productsList = response.data.products || response.data;
+      setProducts(productsList.filter(p => !p.deleted && p.quantite_stock > 0));
     } catch (err) {
       console.error('Failed to load products:', err);
     }
@@ -255,6 +415,49 @@ const AchatForm = ({ onSuccess, onCancel }) => {
     }
   };
 
+  const addFullProductToCart = (produitId, poids, prixTotal) => {
+    const product = products.find(p => p.id === produitId);
+    if (!product) return;
+
+    // Vérifier qu'il y a au moins une pièce complète disponible
+    // Pour les produits avec poids, quantite_stock est en nombre de pièces
+    // Il faut au moins 1 pièce complète pour acheter la totalité
+    if (product.quantite_stock < 1) {
+      const stockDisplay = formatStockDisplay(product);
+      setError(`Stock insuffisant. Disponible: ${stockDisplay}, demandé: ${poids} ${product.uniteMesure} (1 pièce complète)`);
+      return;
+    }
+
+    // Calculer le prix unitaire équivalent pour que le total soit égal à prixTotal
+    const prixUnitaireEquivalent = prixTotal / poids;
+
+    const existingItem = cart.find(item => item.produitId === produitId);
+    
+    if (existingItem) {
+      // Remplacer l'item existant par la totalité
+      setCart(cart.map(item =>
+        item.produitId === produitId
+          ? {
+              ...item,
+              quantite: poids.toString(),
+              prixUnitaire: prixUnitaireEquivalent,
+              remise: '0'
+            }
+          : item
+      ));
+    } else {
+      setCart([...cart, {
+        produitId: produitId,
+        nom: product.nom,
+        quantite: poids.toString(),
+        prixUnitaire: prixUnitaireEquivalent,
+        remise: '0',
+        maxQuantite: product.quantite_stock,
+        venduParUnite: product.venduParUnite
+      }]);
+    }
+  };
+
   const updateCartItem = (produitId, field, value) => {
     setCart(cart.map(item => {
       if (item.produitId === produitId) {
@@ -320,7 +523,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
       const data = {
         clientId: selectedClient.id,
         remiseGlobale: parseFloat(formData.remiseGlobale) || 0,
-        notes: formData.notes,
+        versment: parseFloat(formData.versment) || 0,
         ligneAchats: cart.map(item => ({
           produitId: item.produitId,
           quantite: parseFloat(item.quantite),
@@ -681,6 +884,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                     cartItem={cartItem}
                     onAddToCart={(qty) => addToCart(product, qty)}
                     onUpdateCart={(qty) => updateCartItem(product.id, 'quantite', qty)}
+                    onAddFullProduct={(poids, prixTotal) => addFullProductToCart(product.id, poids, prixTotal)}
                   />
                 );
               })}
@@ -759,55 +963,119 @@ const AchatForm = ({ onSuccess, onCancel }) => {
               </div>
             )}
 
-            {/* Discount and Notes */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            {/* Discount, Versment and Final Total */}
+            <div style={{ 
+              padding: '1.5rem', 
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)', 
+              borderRadius: '12px',
+              border: '2px solid #e5e7eb',
+              marginBottom: '1.5rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Global Discount (DA)</label>
+                  <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>💵 Global Discount (DA)</label>
                 <input
                   type="number"
                   value={formData.remiseGlobale}
                   onChange={(e) => setFormData({ ...formData, remiseGlobale: e.target.value })}
                   step="0.01"
                   min="0"
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                    placeholder="0.00"
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 1rem', 
+                      border: '2px solid #e5e7eb', 
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      background: 'white'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#667eea';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
+                    }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Final Total</label>
+                  <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>💰 Versment (DA)</label>
+                <input
+                  type="number"
+                  value={formData.versment}
+                  onChange={(e) => setFormData({ ...formData, versment: e.target.value })}
+                  step="0.01"
+                  min="0"
+                    placeholder="0.00"
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 1rem', 
+                      border: '2px solid #e5e7eb', 
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      background: 'white'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#667eea';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                />
+              </div>
+            </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>📊 Final Total</label>
                 <div style={{
-                  padding: '0.75rem',
-                  background: '#e8f5e9',
-                  borderRadius: '6px',
-                  fontSize: '1.25rem',
-                  fontWeight: 'bold',
-                  color: '#2e7d32',
-                  textAlign: 'center'
+                  padding: '1.25rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '10px',
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  textAlign: 'center',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
                 }}>
                   {calculateTotal().toFixed(2)} DA
                 </div>
               </div>
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Notes</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows="3"
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', resize: 'vertical' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem', 
+              justifyContent: 'flex-end',
+              paddingTop: '1.5rem',
+              borderTop: '2px solid #e5e7eb'
+            }}>
               <button
                 type="button"
                 onClick={onCancel}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                }}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '6px',
+                  padding: '0.875rem 2rem',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '10px',
                   background: 'white',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  transition: 'all 0.2s ease'
                 }}
               >
                 Cancel
@@ -815,17 +1083,33 @@ const AchatForm = ({ onSuccess, onCancel }) => {
               <button
                 type="submit"
                 disabled={loading || cart.length === 0}
+                onMouseEnter={(e) => {
+                  if (!loading && cart.length > 0) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #5568d3 0%, #667eea 100%)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!loading && cart.length > 0) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }
+                }}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: '0.875rem 2rem',
                   border: 'none',
-                  borderRadius: '6px',
-                  background: '#667eea',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: 'white',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: (loading || cart.length === 0) ? 0.6 : 1
+                  cursor: loading || cart.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: (loading || cart.length === 0) ? 0.6 : 1,
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  transition: 'all 0.2s ease',
+                  boxShadow: (loading || cart.length === 0) ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)'
                 }}
               >
-                {loading ? 'Creating...' : 'Confirm Purchase'}
+                {loading ? 'Creating...' : '✓ Confirm Purchase'}
               </button>
             </div>
           </form>

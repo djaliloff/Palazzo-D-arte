@@ -124,80 +124,137 @@ const ClientForm = ({ client, onSuccess, onCancel }) => {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>First Name *</label>
-              <input
-                type="text"
-                name="nom"
-                value={formData.nom}
-                onChange={handleChange}
-                required
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-              />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>First Name *</label>
+                <input
+                  type="text"
+                  name="nom"
+                  value={formData.nom}
+                  onChange={handleChange}
+                  required
+                  style={{ width: '100%', padding: '0.875rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem', transition: 'all 0.2s ease', outline: 'none' }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#667eea';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Last Name</label>
+                <input
+                  type="text"
+                  name="prenom"
+                  value={formData.prenom}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '0.875rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem', transition: 'all 0.2s ease', outline: 'none' }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#667eea';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Last Name</label>
-              <input
-                type="text"
-                name="prenom"
-                value={formData.prenom}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-              />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '0.875rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem', transition: 'all 0.2s ease', outline: 'none' }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#667eea';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Phone</label>
+                <input
+                  type="text"
+                  name="telephone"
+                  value={formData.telephone}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '0.875rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem', transition: 'all 0.2s ease', outline: 'none' }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#667eea';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
             </div>
+
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Email</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Phone</label>
-              <input
-                type="text"
-                name="telephone"
-                value={formData.telephone}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-              />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Address</label>
+              <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Address</label>
               <input
                 type="text"
                 name="adresse"
                 value={formData.adresse}
                 onChange={handleChange}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                style={{ width: '100%', padding: '0.875rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem', transition: 'all 0.2s ease', outline: 'none' }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e5e7eb';
+                  e.target.style.boxShadow = 'none';
+                }}
               />
             </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Client Type</label>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Client Type</label>
               <select
                 name="type"
                 value={formData.type}
                 onChange={handleChange}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                style={{ width: '100%', padding: '0.875rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem', background: 'white', cursor: 'pointer', transition: 'all 0.2s ease', outline: 'none' }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e5e7eb';
+                  e.target.style.boxShadow = 'none';
+                }}
               >
                 <option value="SIMPLE">Simple</option>
                 <option value="PEINTRE">Peintre</option>
               </select>
             </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem', background: '#f9fafb', borderRadius: '8px', border: '2px solid #e5e7eb' }}>
               <input
                 type="checkbox"
                 name="actif"
                 checked={formData.actif}
                 onChange={handleChange}
                 id="actif"
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
               />
-              <label htmlFor="actif" style={{ cursor: 'pointer' }}>
-                Active
+              <label htmlFor="actif" style={{ cursor: 'pointer', fontWeight: 500, fontSize: '0.95rem', color: '#374151' }}>
+                Active Client
               </label>
             </div>
           </div>

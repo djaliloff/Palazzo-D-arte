@@ -9,14 +9,15 @@ const Sidebar = ({ logout }) => {
 
   const baseMenuItems = [
     { path: '/', name: 'Dashboard', icon: '📊' },
+    { path: '/lancer-achat', name: 'Lancer Achat', icon: '🛒' },
     { path: '/clients', name: 'Clients', icon: '👥' },
     { path: '/products', name: 'Products', icon: '📦' },
-    { path: '/achats', name: 'Achats', icon: '🛒' },
+    { path: '/achats', name: 'Historique d\'Achats', icon: '📋' },
     { path: '/retours', name: 'Retours', icon: '↩️' },
   ];
 
   const adminMenuItems = [
-    { path: '/categories', name: 'Categories', icon: '📋' },
+    { path: '/categories', name: 'Categories', icon: '📝' },
     { path: '/marques', name: 'Brands', icon: '🏷️' },
     { path: '/statistics', name: 'Statistics', icon: '📈' },
   ];
@@ -46,14 +47,14 @@ const Sidebar = ({ logout }) => {
       </div>
 
       {/* User Profile */}
-      <div className="sidebar-profile">
+      {/* <div className="sidebar-profile">
         <div className="avatar">{getInitials()}</div>
         <div className="profile-info">
           <div className="profile-name">{user?.nom} {user?.prenom}</div>
           <div className="profile-email">{user?.email}</div>
           <div className="profile-role">{user?.role}</div>
         </div>
-      </div>
+      </div> */}
 
       {/* Navigation Menu */}
       <nav className="sidebar-nav">

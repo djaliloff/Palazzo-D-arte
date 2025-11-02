@@ -25,10 +25,9 @@ const RetoursPage = () => {
         }}>
           Retours (Returns)
         </h1>
-        {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            onMouseEnter={(e) => {
+        <button
+          onClick={() => setShowForm(true)}
+          onMouseEnter={(e) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #5568d3 0%, #667eea 100%)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
@@ -54,7 +53,6 @@ const RetoursPage = () => {
           >
             <span>+</span> New Return
           </button>
-        )}
       </div>
 
       {showForm ? (

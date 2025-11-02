@@ -54,10 +54,35 @@ export const getAllAchats = asyncHandler(async (req, res) => {
               nom: true,
               uniteMesure: true
             }
+          },
+          ligneRetours: {
+            include: {
+              retour: {
+                select: {
+                  id: true,
+                  numeroRetour: true,
+                  dateRetour: true
+                }
+              }
+            }
           }
         }
       },
-      retours: true
+      retours: {
+        include: {
+          ligneRetours: {
+            include: {
+              produit: {
+                select: {
+                  id: true,
+                  reference: true,
+                  nom: true
+                }
+              }
+            }
+          }
+        }
+      }
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -92,14 +117,38 @@ export const getAchatById = asyncHandler(async (req, res) => {
               categorie: true
             }
           },
-          ligneRetours: true
+          ligneRetours: {
+            include: {
+              retour: {
+                select: {
+                  id: true,
+                  numeroRetour: true,
+                  dateRetour: true,
+                  typeRetour: true
+                }
+              },
+              produit: {
+                select: {
+                  id: true,
+                  reference: true,
+                  nom: true
+                }
+              }
+            }
+          }
         }
       },
       retours: {
         include: {
           ligneRetours: {
             include: {
-              produit: true
+              produit: {
+                select: {
+                  id: true,
+                  reference: true,
+                  nom: true
+                }
+              }
             }
           }
         }
@@ -122,7 +171,7 @@ export const getAchatById = asyncHandler(async (req, res) => {
  * POST /api/achats
  */
 export const createAchat = asyncHandler(async (req, res) => {
-  const { clientId, ligneAchats, remiseGlobale, notes } = req.body;
+  const { clientId, ligneAchats, remiseGlobale, notes, versment } = req.body;
 
   if (!clientId || !ligneAchats || ligneAchats.length === 0) {
     return res.status(400).json({
@@ -147,10 +196,34 @@ export const createAchat = asyncHandler(async (req, res) => {
     }
 
     // Check stock availability
-    if (ligne.quantite > produit.quantite_stock) {
+    // Si le produit a un poids défini et que l'unité de mesure est KG,
+    // convertir les kg achetés en fraction de pièce pour la validation
+    let quantiteToCheck = ligne.quantite;
+    if (produit.poids && produit.uniteMesure === 'KG' && produit.venduParUnite) {
+      // Convertir les kg achetés en fraction de pièce
+      quantiteToCheck = ligne.quantite / produit.poids;
+    }
+    
+    if (quantiteToCheck > produit.quantite_stock) {
+      // Formater le message d'erreur selon le type de produit
+      let availableStock = produit.quantite_stock;
+      if (produit.poids && produit.uniteMesure === 'KG' && produit.venduParUnite) {
+        const piecesCompletes = Math.floor(produit.quantite_stock);
+        const resteEnKg = (produit.quantite_stock - piecesCompletes) * produit.poids;
+        if (resteEnKg > 0 && piecesCompletes > 0) {
+          availableStock = `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''} et ${resteEnKg.toFixed(2)} kg`;
+        } else if (piecesCompletes > 0) {
+          availableStock = `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''}`;
+        } else {
+          availableStock = `${resteEnKg.toFixed(2)} kg`;
+        }
+      } else {
+        availableStock = `${produit.quantite_stock} ${produit.uniteMesure}`;
+      }
+      
       return res.status(400).json({
         error: 'Validation Error',
-        message: `Insufficient stock for ${produit.nom}. Available: ${produit.quantite_stock}`
+        message: `Insufficient stock for ${produit.nom}. Available: ${availableStock}`
       });
     }
 
@@ -171,6 +244,7 @@ export const createAchat = asyncHandler(async (req, res) => {
       remiseGlobale: remise,
       prix_total_remise,
       notes,
+      versment: parseFloat(versment) || 0,
       ligneAchats: {
         create: ligneAchats.map(ligne => ({
           produitId: ligne.produitId,
@@ -205,11 +279,27 @@ export const createAchat = asyncHandler(async (req, res) => {
 
   // Update stock for each product
   for (const ligne of ligneAchats) {
+    const produit = await prisma.produit.findUnique({
+      where: { id: ligne.produitId }
+    });
+
+    if (!produit) continue;
+
+    let quantiteToDecrement = ligne.quantite;
+
+    // Si le produit a un poids défini et que l'unité de mesure est KG,
+    // convertir les kg achetés en fraction de pièce
+    if (produit.poids && produit.uniteMesure === 'KG' && produit.venduParUnite) {
+      // Convertir les kg achetés en fraction de pièce
+      // Par exemple: 2 kg / 10 kg = 0.2 pièce
+      quantiteToDecrement = ligne.quantite / produit.poids;
+    }
+
     await prisma.produit.update({
       where: { id: ligne.produitId },
       data: {
         quantite_stock: {
-          decrement: ligne.quantite
+          decrement: quantiteToDecrement
         }
       }
     });

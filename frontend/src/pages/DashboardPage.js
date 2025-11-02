@@ -63,6 +63,23 @@ const DashboardPage = () => {
     }
   };
 
+  // Calculer le montant total des retours pour un achat
+  const calculateTotalReturns = (achat) => {
+    if (!achat.retours || achat.retours.length === 0) {
+      return 0;
+    }
+    return achat.retours.reduce((total, retour) => {
+      return total + (parseFloat(retour.montantRembourse) || 0);
+    }, 0);
+  };
+
+  // Calculer le prix réel (après retours)
+  const calculateRealPrice = (achat) => {
+    const totalReturns = calculateTotalReturns(achat);
+    const prixInitial = parseFloat(achat.prix_total_remise || 0);
+    return Math.max(0, prixInitial - totalReturns);
+  };
+
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading dashboard...</div>;
   }
@@ -216,7 +233,19 @@ const DashboardPage = () => {
                         </span>
                       </td>
                       <td style={{ padding: '0.75rem', textAlign: 'right', color: '#333', fontWeight: 500 }}>
-                        {parseFloat(achat.prix_total_remise).toFixed(2)} DA
+                        {calculateRealPrice(achat).toFixed(2)} DA
+                        {calculateTotalReturns(achat) > 0 && (
+                          <div style={{ 
+                            fontSize: '0.7rem', 
+                            color: '#ef4444',
+                            marginTop: '0.25rem',
+                            textDecoration: 'line-through',
+                            opacity: 0.7,
+                            fontWeight: 'normal'
+                          }}>
+                            ({parseFloat(achat.prix_total_remise).toFixed(2)} initial)
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '0.75rem', color: '#666' }}>
                         {new Date(achat.dateAchat).toLocaleDateString()}

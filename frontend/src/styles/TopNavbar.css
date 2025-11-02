@@ -1,7 +1,7 @@
 .top-navbar {
   background: white;
   border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 2rem;
+  padding: 0.1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -17,18 +17,6 @@
   max-width: 600px;
 }
 
-.search-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 1rem;
-  font-size: 1.2rem;
-  color: #666;
-}
 
 .search-input {
   width: 100%;
