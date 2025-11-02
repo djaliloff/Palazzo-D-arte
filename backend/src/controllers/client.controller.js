@@ -37,11 +37,25 @@ export const getAllClients = asyncHandler(async (req, res) => {
           achats: true,
           retours: true
         }
+      },
+      achats: {
+        select: {
+          prix_total_remise: true
+        }
       }
     }
   });
 
-  res.json(clients);
+  // Calculate total spent for each client
+  const clientsWithTotal = clients.map(client => {
+    const totalSpent = client.achats.reduce((sum, achat) => sum + (achat.prix_total_remise || 0), 0);
+    return {
+      ...client,
+      totalSpent
+    };
+  });
+
+  res.json(clientsWithTotal);
 });
 
 /**

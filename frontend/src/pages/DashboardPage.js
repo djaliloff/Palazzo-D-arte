@@ -9,10 +9,12 @@ const DashboardPage = () => {
     activeClients: 0,
     lowStockCount: 0
   });
+  const [recentAchats, setRecentAchats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStats();
+    fetchRecentAchats();
   }, []);
 
   const fetchStats = async () => {
@@ -23,6 +25,41 @@ const DashboardPage = () => {
       console.error('Failed to load stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRecentAchats = async () => {
+    try {
+      const response = await api.get('/achats', {
+        params: { limit: 5 }
+      });
+      // Get only the first 5
+      setRecentAchats(response.data.slice(0, 5));
+    } catch (error) {
+      console.error('Failed to load recent purchases:', error);
+    }
+  };
+
+  const getStatusBadgeColor = (statut) => {
+    switch (statut) {
+      case 'VALIDE': 
+        return { bg: '#e8f5e9', color: '#2e7d32', text: 'Valide' };
+      case 'RETOURNE_PARTIEL': 
+        return { bg: '#fff3e0', color: '#e65100', text: 'Retourné Partiel' };
+      case 'RETOURNE_TOTAL': 
+        return { bg: '#ffebee', color: '#c62828', text: 'Retourné Total' };
+      default: 
+        return { bg: '#f5f5f5', color: '#666', text: statut };
+    }
+  };
+
+  const getClientTypeBadgeColor = (type) => {
+    switch (type) {
+      case 'PEINTRE':
+        return { bg: '#fff9c4', color: '#f57f17', text: 'Peintre' };
+      case 'SIMPLE':
+      default:
+        return { bg: '#e3f2fd', color: '#1976d2', text: 'Client' };
     }
   };
 
@@ -100,18 +137,99 @@ const DashboardPage = () => {
         ))}
       </div>
 
-      {/* Welcome Message */}
+      {/* Recent Purchases */}
       <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
-        padding: '2rem',
+        background: 'white',
+        padding: '1.5rem',
         borderRadius: '12px',
-        textAlign: 'center'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
-        <h2 style={{ margin: '0 0 0.5rem 0' }}>Welcome to Paint Store Management</h2>
-        <p style={{ margin: 0, opacity: 0.9 }}>
-          Manage your inventory, sales, and returns all in one place
-        </p>
+        <h2 style={{ margin: '0 0 1.5rem 0', color: '#333' }}>Recent Purchases</h2>
+        {recentAchats.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+            Aucun achat récent
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              fontSize: '0.9rem'
+            }}>
+              <thead>
+                <tr style={{ 
+                  background: '#f5f5f5',
+                  borderBottom: '2px solid #ddd'
+                }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>BON N°</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>CLIENT</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>TELEPHONE</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>TYPE</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 600 }}>AMOUNT</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>DATE</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentAchats.map((achat) => {
+                  const statusBadge = getStatusBadgeColor(achat.statut);
+                  const typeBadge = getClientTypeBadgeColor(achat.client?.type);
+                  return (
+                    <tr key={achat.id} style={{ 
+                      borderBottom: '1px solid #eee',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f9f9f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <td style={{ padding: '0.75rem', color: '#333', fontWeight: 500 }}>
+                        {achat.numeroBon}
+                      </td>
+                      <td style={{ padding: '0.75rem', color: '#333' }}>
+                        {achat.client?.prenom || ''} {achat.client?.nom || ''}
+                      </td>
+                      <td style={{ padding: '0.75rem', color: '#666' }}>
+                        {achat.client?.telephone || '—'}
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                          fontWeight: 500,
+                          background: typeBadge.bg,
+                          color: typeBadge.color,
+                          display: 'inline-block'
+                        }}>
+                          {typeBadge.text}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right', color: '#333', fontWeight: 500 }}>
+                        {parseFloat(achat.prix_total_remise).toFixed(2)} DA
+                      </td>
+                      <td style={{ padding: '0.75rem', color: '#666' }}>
+                        {new Date(achat.dateAchat).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span style={{
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                          fontWeight: 500,
+                          background: statusBadge.bg,
+                          color: statusBadge.color,
+                          display: 'inline-block'
+                        }}>
+                          {statusBadge.text}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

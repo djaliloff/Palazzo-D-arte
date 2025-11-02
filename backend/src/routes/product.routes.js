@@ -5,7 +5,8 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  getLowStockProducts
+  getLowStockProducts,
+  addStockToProduct
 } from '../controllers/product.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireStaff } from '../middlewares/role.middleware.js';
@@ -31,6 +32,9 @@ router.use(requireStaff);
 
 // Create product
 router.post('/', createProduct);
+
+// Add stock to product
+router.post('/add-stock', addStockToProduct);
 
 // Update product
 router.put('/:id', updateProduct);

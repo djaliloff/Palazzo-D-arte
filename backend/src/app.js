@@ -11,6 +11,8 @@ import productRoutes from './routes/product.routes.js';
 import achatRoutes from './routes/achat.routes.js';
 import retourRoutes from './routes/retour.routes.js';
 import statsRoutes from './routes/stats.routes.js';
+import marqueRoutes from './routes/marque.routes.js';
+import categorieRoutes from './routes/categorie.routes.js';
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/achats', achatRoutes);
 app.use('/api/retours', retourRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/marques', marqueRoutes);
+app.use('/api/categories', categorieRoutes);
 
 // 404 handler
 app.use(notFound);

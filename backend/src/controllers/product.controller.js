@@ -110,6 +110,9 @@ export const createProduct = asyncHandler(async (req, res) => {
       marqueId: parseInt(marqueId),
       categorieId: parseInt(categorieId),
       seuilAlerte: seuilAlerte || 5,
+      quantite_stock: parseFloat(req.body.quantite_stock) || 0,
+      quantite_depos: parseFloat(req.body.quantite_depos) || 0,
+      date_expiration: req.body.date_expiration ? new Date(req.body.date_expiration) : null,
       venduParUnite: venduParUnite !== undefined ? venduParUnite : true
     },
     include: {
@@ -193,5 +196,71 @@ export const getLowStockProducts = asyncHandler(async (req, res) => {
   lowStockProducts.sort((a, b) => a.quantite_stock - b.quantite_stock);
 
   res.json(lowStockProducts);
+});
+
+/**
+ * Add stock and/or depot quantities to a product
+ * POST /api/products/add-stock
+ */
+export const addStockToProduct = asyncHandler(async (req, res) => {
+  const {
+    produitId,
+    quantite_stock_ajout,
+    quantite_depos_ajout,
+    date_expiration
+  } = req.body;
+
+  if (!produitId) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Product ID is required'
+    });
+  }
+
+  if (!quantite_stock_ajout && !quantite_depos_ajout) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'At least one quantity (stock or depot) must be provided'
+    });
+  }
+
+  // Get current product
+  const produit = await prisma.produit.findUnique({
+    where: { id: parseInt(produitId) }
+  });
+
+  if (!produit || produit.deleted) {
+    return res.status(404).json({
+      error: 'Not Found',
+      message: 'Product not found'
+    });
+  }
+
+  // Calculate new quantities
+  const newQuantiteStock = (produit.quantite_stock || 0) + (parseFloat(quantite_stock_ajout) || 0);
+  const newQuantiteDepos = (produit.quantite_depos || 0) + (parseFloat(quantite_depos_ajout) || 0);
+
+  // Update product
+  const updateData = {
+    quantite_stock: newQuantiteStock,
+    quantite_depos: newQuantiteDepos
+  };
+
+  // Update expiration date if provided
+  if (date_expiration) {
+    updateData.date_expiration = new Date(date_expiration);
+  }
+
+  const updatedProduit = await prisma.produit.update({
+    where: { id: parseInt(produitId) },
+    data: updateData,
+    include: {
+      marque: true,
+      categorie: true
+    }
+  });
+
+  logger.success(`Stock added to product: ${updatedProduit.nom} (Stock: +${quantite_stock_ajout || 0}, Depot: +${quantite_depos_ajout || 0})`);
+  res.json(updatedProduit);
 });
 
