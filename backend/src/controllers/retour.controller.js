@@ -287,31 +287,40 @@ export const createRetour = asyncHandler(async (req, res) => {
     });
   }
 
-  // Update achat statut if necessary
-  const totalLignesAchat = achat.ligneAchats.length;
-  const lignesAchat = await prisma.ligneAchat.findMany({
+  // Update achat statut based on all returns
+  const allLignesAchat = await prisma.ligneAchat.findMany({
     where: {
       achatId: achatId
+    },
+    include: {
+      ligneRetours: true
     }
   });
   
-  const lignesTotalementRetournees = lignesAchat.filter(
-    ligne => ligne.quantiteRetournee >= ligne.quantite
-  ).length;
+  // Check if all lines are fully returned
+  const allLinesReturned = allLignesAchat.every(ligne => {
+    const totalReturned = ligne.ligneRetours?.reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0) || 0;
+    return totalReturned >= ligne.quantite;
+  });
+  
+  // Check if some lines are returned
+  const someLinesReturned = allLignesAchat.some(ligne => {
+    const totalReturned = ligne.ligneRetours?.reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0) || 0;
+    return totalReturned > 0;
+  });
 
   let newStatut = achat.statut;
-  if (lignesTotalementRetournees === totalLignesAchat) {
+  if (allLinesReturned && allLignesAchat.length > 0) {
     newStatut = 'RETOURNE_TOTAL';
-  } else if (lignesTotalementRetournees > 0) {
+  } else if (someLinesReturned) {
     newStatut = 'RETOURNE_PARTIEL';
   }
 
-  if (newStatut !== achat.statut) {
-    await prisma.achat.update({
-      where: { id: achatId },
-      data: { statut: newStatut }
-    });
-  }
+  // Always update status to reflect current state
+  await prisma.achat.update({
+    where: { id: achatId },
+    data: { statut: newStatut }
+  });
 
   logger.success(`Return created: ${retour.numeroRetour}`);
   res.status(201).json(retour);

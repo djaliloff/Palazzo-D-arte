@@ -455,6 +455,7 @@ const ProductList = ({ onEdit }) => {
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           onEdit={onEdit}
+          onDelete={handleDelete}
         />
       )}
     </div>
@@ -465,6 +466,7 @@ const ProductList = ({ onEdit }) => {
 const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
   return (
     <div 
+      onClick={() => onViewDetails()}
       style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -616,83 +618,40 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '0.4rem', 
-        marginTop: 'auto',
-        paddingTop: '0.5rem',
-        borderTop: '1px solid #e5e7eb'
-      }}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewDetails();
-          }}
-          style={{
-            flex: 1,
-            padding: '0.4rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            border: 'none',
+      {/* Expiring Lots Alert */}
+      {(() => {
+        if (!product.lot_de_stock || product.lot_de_stock.length === 0) return null;
+        
+        const now = new Date();
+        const sixMonthsFromNow = new Date();
+        sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+        
+        const expiringLots = product.lot_de_stock.filter(lot => {
+          if (!lot.date_expiration) return false;
+          const expirationDate = new Date(lot.date_expiration);
+          return expirationDate > now && expirationDate <= sixMonthsFromNow;
+        });
+        
+        if (expiringLots.length === 0) return null;
+        
+        const earliestExpiration = new Date(Math.min(...expiringLots.map(lot => new Date(lot.date_expiration))));
+        const daysUntilExpiration = Math.ceil((earliestExpiration - now) / (1000 * 60 * 60 * 24));
+        
+        return (
+          <div style={{
+            background: daysUntilExpiration <= 30 ? '#fee2e2' : '#fef3c7',
+            color: daysUntilExpiration <= 30 ? '#dc2626' : '#d97706',
+            padding: '0.3rem',
             borderRadius: '6px',
-            cursor: 'pointer',
+            marginBottom: '0.5rem',
+            textAlign: 'center',
             fontSize: '0.7rem',
-            fontWeight: 600,
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          👁️ Details
-        </button>
-        {onEdit && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(product);
-            }}
-            style={{
-              flex: 1,
-              padding: '0.4rem',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.7rem',
-              fontWeight: 600,
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            ✏️ Edit
-          </button>
-        )}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(product);
-          }}
-          style={{
-            flex: 1,
-            padding: '0.4rem',
-            background: '#ef4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.7rem',
-            fontWeight: 600,
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          🗑️ Delete
-        </button>
-      </div>
+            fontWeight: 600
+          }}>
+            {daysUntilExpiration <= 30 ? '🚨' : '⚠️'} Expire dans {daysUntilExpiration}j
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -701,6 +660,7 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
 const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
   return (
     <div 
+      onClick={() => onViewDetails()}
       style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -709,9 +669,10 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
         transition: 'all 0.3s ease',
         display: 'grid',
-        gridTemplateColumns: '120px 1fr auto',
+        gridTemplateColumns: '120px 1fr',
         gap: '1rem',
-        alignItems: 'center'
+        alignItems: 'center',
+        cursor: 'pointer'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
@@ -803,60 +764,53 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
             <span>{product.categorie?.nom}</span>
           </div>
         </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <button
-          onClick={() => onViewDetails()}
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            whiteSpace: 'nowrap'
-          }}
-        >
-          👁️ Details
-        </button>
-        {onEdit && (
-          <button
-            onClick={() => onEdit(product)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              whiteSpace: 'nowrap'
-          }}
-          >
-            ✏️ Edit
-          </button>
-        )}
-        <button
-          onClick={() => onDelete(product)}
-          style={{
-            padding: '0.5rem 1rem',
-            background: '#ef4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            whiteSpace: 'nowrap'
-          }}
-        >
-          🗑️ Delete
-        </button>
+        
+        {/* Alerts */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          {product.quantite_stock <= product.seuilAlerte && (
+            <div style={{
+              background: '#fee2e2',
+              color: '#dc2626',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              fontWeight: 600
+            }}>
+              ⚠️ Low Stock
+            </div>
+          )}
+          {(() => {
+            if (!product.lot_de_stock || product.lot_de_stock.length === 0) return null;
+            
+            const now = new Date();
+            const sixMonthsFromNow = new Date();
+            sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+            
+            const expiringLots = product.lot_de_stock.filter(lot => {
+              if (!lot.date_expiration) return false;
+              const expirationDate = new Date(lot.date_expiration);
+              return expirationDate > now && expirationDate <= sixMonthsFromNow;
+            });
+            
+            if (expiringLots.length === 0) return null;
+            
+            const earliestExpiration = new Date(Math.min(...expiringLots.map(lot => new Date(lot.date_expiration))));
+            const daysUntilExpiration = Math.ceil((earliestExpiration - now) / (1000 * 60 * 60 * 24));
+            
+            return (
+              <div style={{
+                background: daysUntilExpiration <= 30 ? '#fee2e2' : '#fef3c7',
+                color: daysUntilExpiration <= 30 ? '#dc2626' : '#d97706',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600
+              }}>
+                {daysUntilExpiration <= 30 ? '🚨' : '⚠️'} Expire dans {daysUntilExpiration}j
+              </div>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );

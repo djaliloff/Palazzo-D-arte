@@ -6,6 +6,7 @@ import {
   updateProduct,
   deleteProduct,
   getLowStockProducts,
+  getExpiringLots,
   addStockToProduct
 } from '../controllers/product.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
@@ -22,6 +23,9 @@ router.get('/', getAllProducts);
 
 // Get low stock alerts
 router.get('/alerts/low-stock', getLowStockProducts);
+
+// Get expiring lots alerts (within 6 months)
+router.get('/alerts/expiring', getExpiringLots);
 
 // Get single product
 router.get('/:id', getProductById);

@@ -87,7 +87,52 @@ export const getAllAchats = asyncHandler(async (req, res) => {
     orderBy: { createdAt: 'desc' }
   });
 
-  res.json(achats);
+  // Calculate actual prices after returns
+  const achatsWithCalculatedPrices = achats.map(achat => {
+    // Calculate total returned amount
+    let totalReturned = 0;
+    if (achat.retours && achat.retours.length > 0) {
+      for (const retour of achat.retours) {
+        if (retour.ligneRetours && retour.ligneRetours.length > 0) {
+          for (const ligneRetour of retour.ligneRetours) {
+            totalReturned += ligneRetour.montantLigne || 0;
+          }
+        }
+      }
+    }
+
+    // Calculate actual price (original - returns)
+    const prix_effectif = Math.max(0, achat.prix_total_remise - totalReturned);
+
+    // Determine statut based on returns
+    let calculatedStatut = achat.statut;
+    if (achat.ligneAchats && achat.ligneAchats.length > 0) {
+      const allLinesReturned = achat.ligneAchats.every(ligne => {
+        const totalReturned = ligne.ligneRetours?.reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0) || 0;
+        return totalReturned >= ligne.quantite;
+      });
+      
+      const someLinesReturned = achat.ligneAchats.some(ligne => {
+        const totalReturned = ligne.ligneRetours?.reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0) || 0;
+        return totalReturned > 0;
+      });
+
+      if (allLinesReturned) {
+        calculatedStatut = 'RETOURNE_TOTAL';
+      } else if (someLinesReturned) {
+        calculatedStatut = 'RETOURNE_PARTIEL';
+      }
+    }
+
+    return {
+      ...achat,
+      prix_effectif,
+      montant_retourne: totalReturned,
+      statut: calculatedStatut
+    };
+  });
+
+  res.json(achatsWithCalculatedPrices);
 });
 
 /**
@@ -163,7 +208,46 @@ export const getAchatById = asyncHandler(async (req, res) => {
     });
   }
 
-  res.json(achat);
+  // Calculate actual price after returns
+  let totalReturned = 0;
+  if (achat.retours && achat.retours.length > 0) {
+    for (const retour of achat.retours) {
+      if (retour.ligneRetours && retour.ligneRetours.length > 0) {
+        for (const ligneRetour of retour.ligneRetours) {
+          totalReturned += ligneRetour.montantLigne || 0;
+        }
+      }
+    }
+  }
+
+  const prix_effectif = Math.max(0, achat.prix_total_remise - totalReturned);
+
+  // Determine statut
+  let calculatedStatut = achat.statut;
+  if (achat.ligneAchats && achat.ligneAchats.length > 0) {
+    const allLinesReturned = achat.ligneAchats.every(ligne => {
+      const ligneTotalReturned = ligne.ligneRetours?.reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0) || 0;
+      return ligneTotalReturned >= ligne.quantite;
+    });
+    
+    const someLinesReturned = achat.ligneAchats.some(ligne => {
+      const ligneTotalReturned = ligne.ligneRetours?.reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0) || 0;
+      return ligneTotalReturned > 0;
+    });
+
+    if (allLinesReturned) {
+      calculatedStatut = 'RETOURNE_TOTAL';
+    } else if (someLinesReturned) {
+      calculatedStatut = 'RETOURNE_PARTIEL';
+    }
+  }
+
+  res.json({
+    ...achat,
+    prix_effectif,
+    montant_retourne: totalReturned,
+    statut: calculatedStatut
+  });
 });
 
 /**

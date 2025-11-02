@@ -67,22 +67,41 @@
 /* Notifications Dropdown */
 .notifications-dropdown {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + 0.75rem);
   right: 0;
-  width: 300px;
+  width: 380px;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   z-index: 1000;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .notification-header {
-  padding: 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-  font-weight: 600;
-  color: #333;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 2px solid #fcd34d;
+  font-weight: 700;
+  color: #78350f;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
 }
 
 .notification-item {

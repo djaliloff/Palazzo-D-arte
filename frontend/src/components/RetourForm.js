@@ -153,7 +153,8 @@ const RetourForm = ({ onSuccess, onCancel }) => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
+      background: 'rgba(0, 0, 0, 0.85)',
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -163,44 +164,87 @@ const RetourForm = ({ onSuccess, onCancel }) => {
     onClick={onCancel}
     >
       <div style={{
-        background: 'white',
-        padding: '2rem',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+        padding: '2.5rem',
+        borderRadius: '24px',
+        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
         maxWidth: '900px',
         width: '100%',
         maxHeight: '90vh',
-        overflow: 'auto'
+        overflow: 'auto',
+        position: 'relative'
       }}
       onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#1f2937' }}>Create New Return</h2>
-          <button
-            onClick={onCancel}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: '#666',
-              padding: '0.5rem',
-              lineHeight: 1
-            }}
-          >
-            ✕
-          </button>
+        {/* Close Button */}
+        <button
+          onClick={onCancel}
+          style={{
+            position: 'absolute',
+            top: '1.5rem',
+            right: '1.5rem',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            border: '2px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '50%',
+            width: '44px',
+            height: '44px',
+            color: '#1f2937',
+            fontSize: '1.5rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#ef4444';
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.color = '#1f2937';
+            e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+          }}
+        >
+          ✕
+        </button>
+
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ 
+            margin: 0,
+            fontSize: '2rem',
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.02em'
+          }}>
+            Create New Return
+          </h2>
         </div>
 
       {error && (
         <div style={{
-          background: '#fee',
-          color: '#c33',
-          padding: '1rem',
-          borderRadius: '6px',
-          marginBottom: '1rem'
+          background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+          color: '#dc2626',
+          padding: '1.25rem',
+          borderRadius: '12px',
+          marginBottom: '1.5rem',
+          border: '2px solid #fca5a5',
+          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          fontWeight: 600
         }}>
-          {error}
+          <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
