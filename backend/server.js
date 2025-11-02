@@ -1,16 +1,9 @@
-import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import clientRoutes from "./routes/clientRoutes.js";
+import app from './src/app.js';
+import { config } from './src/config/env.js';
+import { logger } from './src/utils/logger.js';
 
-dotenv.config();
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-// API routes
-app.use("/api/clients", clientRoutes);
-
-
-app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
+// Start server
+app.listen(config.port, () => {
+  logger.success(`🚀 Server running on http://localhost:${config.port}`);
+  logger.info(`Environment: ${config.nodeEnv}`);
+});
