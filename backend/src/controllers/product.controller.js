@@ -159,7 +159,7 @@ export const getProductById = asyncHandler(async (req, res) => {
     });
     res.json(updatedProduit);
   } catch (error) {
-    res.json(produit);
+  res.json(produit);
   }
 });
 
