@@ -9,6 +9,9 @@ import ClientsPage from './pages/ClientsPage';
 import ProductsPage from './pages/ProductsPage';
 import AchatsPage from './pages/AchatsPage';
 import RetoursPage from './pages/RetoursPage';
+import CategoriesPage from './pages/CategoriesPage';
+import MarquesPage from './pages/MarquesPage';
+import StatisticsPage from './pages/StatisticsPage';
 
 // Components
 import MainLayout from './components/MainLayout';
@@ -70,6 +73,30 @@ const AppRouter = () => {
             <ProtectedRoute>
               <MainLayout>
                 <RetoursPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/categories" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <CategoriesPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/marques" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <MarquesPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/statistics" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <StatisticsPage />
               </MainLayout>
             </ProtectedRoute>
           } />

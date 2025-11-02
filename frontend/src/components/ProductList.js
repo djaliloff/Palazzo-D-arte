@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../services/api';
 
 const ProductList = ({ onEdit }) => {
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -10,12 +11,7 @@ const ProductList = ({ onEdit }) => {
   const [categories, setCategories] = useState([]);
   const [selectedMarque, setSelectedMarque] = useState('');
   const [selectedCategorie, setSelectedCategorie] = useState('');
-
-  useEffect(() => {
-    fetchProducts();
-    fetchMarques();
-    fetchCategories();
-  }, []);
+  const isInitialMount = useRef(true);
 
   const fetchMarques = async () => {
     try {
@@ -35,13 +31,13 @@ const ProductList = ({ onEdit }) => {
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async (marqueId = null, categorieId = null) => {
     try {
       setLoading(true);
       const params = {};
-      if (search) params.search = search;
-      if (selectedMarque) params.marqueId = selectedMarque;
-      if (selectedCategorie) params.categorieId = selectedCategorie;
+      // Only include brand and category filters in API call, not search
+      if (marqueId !== null) params.marqueId = marqueId;
+      if (categorieId !== null) params.categorieId = categorieId;
 
       const response = await api.get('/products', { params });
       setProducts(response.data);
@@ -52,28 +48,60 @@ const ProductList = ({ onEdit }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchMarques();
+    fetchCategories();
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Client-side filtering for search (no API call) - filters instantly without refreshing
+  useEffect(() => {
+    let filtered = [...products];
+
+    // Search filter (client-side only)
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(product =>
+        product.nom?.toLowerCase().includes(searchLower) ||
+        product.reference?.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.marque?.nom?.toLowerCase().includes(searchLower) ||
+        product.categorie?.nom?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setFilteredProducts(filtered);
+  }, [search, products]);
+
+  // When brand or category filter changes, refresh from API (but NOT when search changes)
+  useEffect(() => {
+    // Skip on initial mount (handled by initial load useEffect)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    const marqueId = selectedMarque || null;
+    const categorieId = selectedCategorie || null;
+    fetchProducts(marqueId, categorieId);
+  }, [selectedMarque, selectedCategorie, fetchProducts]);
 
   const handleSearch = (e) => {
     setSearch(e.target.value);
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchProducts();
-  };
-
   const handleFilterChange = () => {
-    fetchProducts();
+    // Filter change will trigger useEffect automatically
   };
 
   const handleClearFilters = () => {
     setSearch('');
     setSelectedMarque('');
     setSelectedCategorie('');
-    setTimeout(() => {
-      fetchProducts();
-    }, 0);
+    // fetchProducts will be triggered automatically by useEffect
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</div>;
@@ -90,7 +118,7 @@ const ProductList = ({ onEdit }) => {
         boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
         border: '1px solid #e5e7eb'
       }}>
-        <form onSubmit={handleSearchSubmit} style={{ 
+        <div style={{ 
           display: 'flex', 
           gap: '0.75rem',
           marginBottom: '1rem',
@@ -186,32 +214,6 @@ const ProductList = ({ onEdit }) => {
             ))}
           </select>
           <button
-            type="submit"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #5568d3 0%, #667eea 100%)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            style={{
-              padding: '0.875rem 1.5rem',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            🔍 Search
-          </button>
-          <button
             type="button"
             onClick={handleClearFilters}
             onMouseEnter={(e) => {
@@ -238,7 +240,7 @@ const ProductList = ({ onEdit }) => {
           >
             🔄 Clear Filters
           </button>
-        </form>
+        </div>
         
         {/* Active Filters Display */}
         {(search || selectedMarque || selectedCategorie) && (
@@ -293,7 +295,7 @@ const ProductList = ({ onEdit }) => {
         )}
       </div>
 
-      {products.length === 0 ? (
+      {filteredProducts.length === 0 ? (
         <div style={{ 
           textAlign: 'center', 
           padding: '3rem 1rem',
@@ -325,14 +327,14 @@ const ProductList = ({ onEdit }) => {
           gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
           gap: '1.25rem' 
         }}>
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div 
               key={product.id} 
               style={{
                 background: 'white',
                 border: '1px solid #e5e7eb',
                 borderRadius: '12px',
-                padding: '1rem',
+                padding: '0.75rem',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)',
                 transition: 'all 0.3s ease',
                 cursor: 'pointer',
@@ -354,11 +356,11 @@ const ProductList = ({ onEdit }) => {
               {/* Product Image */}
               {product.image ? (
                 <div style={{ 
-                  marginBottom: '1rem', 
+                  marginBottom: '0.6rem', 
                   textAlign: 'center',
                   background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
                   borderRadius: '8px',
-                  padding: '0.5rem',
+                  padding: '0.4rem',
                   border: '1px solid #e9ecef'
                 }}>
                   <img 
@@ -366,7 +368,7 @@ const ProductList = ({ onEdit }) => {
                     alt={product.nom}
                     style={{
                       width: '100%',
-                      maxHeight: '120px',
+                      maxHeight: '70px',
                       objectFit: 'contain',
                       borderRadius: '6px'
                     }}
@@ -377,8 +379,8 @@ const ProductList = ({ onEdit }) => {
                 </div>
               ) : (
                 <div style={{
-                  marginBottom: '1rem',
-                  height: '120px',
+                  marginBottom: '0.6rem',
+                  height: '70px',
                   background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
                   borderRadius: '8px',
                   display: 'flex',
@@ -386,12 +388,12 @@ const ProductList = ({ onEdit }) => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#adb5bd',
-                  fontSize: '2rem',
+                  fontSize: '1.5rem',
                   border: '2px dashed #dee2e6',
                   position: 'relative'
                 }}>
-                  <span style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>📦</span>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>No Image</span>
+                  <span style={{ fontSize: '1.5rem', marginBottom: '0.15rem' }}>📦</span>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 500 }}>No Image</span>
                 </div>
               )}
 
@@ -399,14 +401,14 @@ const ProductList = ({ onEdit }) => {
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'flex-start',
-                marginBottom: '0.75rem',
-                gap: '0.5rem'
+                marginBottom: '0.5rem',
+                gap: '0.4rem'
               }}>
                 <h3 style={{ 
                   margin: 0, 
                   color: '#1f2937', 
-                  fontSize: '1rem', 
-                  lineHeight: '1.4',
+                  fontSize: '0.9rem', 
+                  lineHeight: '1.3',
                   fontWeight: 600,
                   flex: 1
                 }}>
@@ -430,9 +432,9 @@ const ProductList = ({ onEdit }) => {
               {product.description && (
                 <p style={{ 
                   color: '#6b7280', 
-                  fontSize: '0.8rem', 
-                  margin: '0 0 1rem 0', 
-                  lineHeight: '1.5', 
+                  fontSize: '0.75rem', 
+                  margin: '0 0 0.6rem 0', 
+                  lineHeight: '1.4', 
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
@@ -446,22 +448,22 @@ const ProductList = ({ onEdit }) => {
               <div style={{ 
                 background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
                 borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '0.75rem',
+                padding: '0.5rem',
+                marginBottom: '0.5rem',
                 border: '1px solid #e9ecef'
               }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                   <div style={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center',
-                    fontSize: '0.85rem'
+                    fontSize: '0.75rem'
                   }}>
                     <span style={{ color: '#6b7280', fontWeight: 500 }}>💰 Price</span>
                     <span style={{ 
                       color: '#1f2937', 
                       fontWeight: 700,
-                      fontSize: '0.9rem'
+                      fontSize: '0.8rem'
                     }}>
                       {product.prixUnitaire} DA
                     </span>
@@ -470,7 +472,7 @@ const ProductList = ({ onEdit }) => {
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center',
-                    fontSize: '0.85rem'
+                    fontSize: '0.75rem'
                   }}>
                     <span style={{ color: '#6b7280', fontWeight: 500 }}>📦 Stock</span>
                     <span style={{ 
@@ -484,7 +486,7 @@ const ProductList = ({ onEdit }) => {
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center',
-                    fontSize: '0.85rem'
+                    fontSize: '0.75rem'
                   }}>
                     <span style={{ color: '#6b7280', fontWeight: 500 }}>🏭 Dépôt</span>
                     <span style={{ 
@@ -501,10 +503,10 @@ const ProductList = ({ onEdit }) => {
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center',
-                fontSize: '0.75rem', 
+                fontSize: '0.7rem', 
                 color: '#6b7280', 
-                marginBottom: '0.75rem',
-                padding: '0.5rem',
+                marginBottom: '0.5rem',
+                padding: '0.4rem',
                 background: '#f9fafb',
                 borderRadius: '6px'
               }}>
@@ -528,11 +530,11 @@ const ProductList = ({ onEdit }) => {
 
               {product.date_expiration && (
                 <div style={{ 
-                  fontSize: '0.75rem', 
+                  fontSize: '0.7rem', 
                   color: new Date(product.date_expiration) < new Date() ? '#ef4444' : '#6b7280',
-                  marginBottom: '0.75rem',
+                  marginBottom: '0.5rem',
                   fontWeight: new Date(product.date_expiration) < new Date() ? 600 : 500,
-                  padding: '0.5rem',
+                  padding: '0.4rem',
                   background: new Date(product.date_expiration) < new Date() ? '#fef2f2' : '#f9fafb',
                   borderRadius: '6px',
                   border: `1px solid ${new Date(product.date_expiration) < new Date() ? '#fecaca' : '#e5e7eb'}`
@@ -546,11 +548,11 @@ const ProductList = ({ onEdit }) => {
                 <div style={{
                   background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
                   color: '#dc2626',
-                  padding: '0.5rem',
+                  padding: '0.4rem',
                   borderRadius: '6px',
-                  marginBottom: '0.75rem',
+                  marginBottom: '0.5rem',
                   textAlign: 'center',
-                  fontSize: '0.75rem',
+                  fontSize: '0.7rem',
                   fontWeight: 600,
                   border: '1px solid #fecaca',
                   boxShadow: '0 2px 4px rgba(239, 68, 68, 0.1)'
@@ -561,9 +563,9 @@ const ProductList = ({ onEdit }) => {
 
               <div style={{ 
                 display: 'flex', 
-                gap: '0.5rem', 
+                gap: '0.4rem', 
                 marginTop: 'auto',
-                paddingTop: '0.75rem',
+                paddingTop: '0.5rem',
                 borderTop: '1px solid #e5e7eb'
               }}>
                 {onEdit && (
@@ -579,13 +581,13 @@ const ProductList = ({ onEdit }) => {
                     }}
                     style={{
                       flex: 1,
-                      padding: '0.5rem',
+                      padding: '0.4rem',
                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '0.8rem',
+                      fontSize: '0.75rem',
                       fontWeight: 600,
                       transition: 'all 0.2s ease',
                       boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)'
@@ -615,13 +617,13 @@ const ProductList = ({ onEdit }) => {
                   }}
                   style={{
                     flex: 1,
-                    padding: '0.5rem',
+                    padding: '0.4rem',
                     background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '6px',
                     cursor: 'pointer',
-                    fontSize: '0.8rem',
+                    fontSize: '0.75rem',
                     fontWeight: 600,
                     transition: 'all 0.2s ease',
                     boxShadow: '0 2px 4px rgba(220, 38, 38, 0.3)'

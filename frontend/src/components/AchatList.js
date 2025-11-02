@@ -648,9 +648,6 @@ const AchatList = () => {
         border: '1px solid #e5e7eb'
       }}>
         <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
           marginBottom: '1.5rem',
           paddingBottom: '1rem',
           borderBottom: '2px solid #e5e7eb'
@@ -672,34 +669,6 @@ const AchatList = () => {
               Showing <strong style={{ color: '#667eea' }}>{filteredAchats.length}</strong> of <strong style={{ color: '#667eea' }}>{achats.length}</strong> purchases
             </p>
           </div>
-          <button
-            onClick={fetchAchats}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#5a6268';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#6c757d';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 4px rgba(108, 117, 125, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            🔄 Refresh
-          </button>
         </div>
 
         {/* Filters */}

@@ -7,13 +7,23 @@ const Sidebar = ({ logout }) => {
   const { user } = useAuth();
   const location = useLocation();
 
-  const menuItems = [
+  const baseMenuItems = [
     { path: '/', name: 'Dashboard', icon: '📊' },
     { path: '/clients', name: 'Clients', icon: '👥' },
     { path: '/products', name: 'Products', icon: '📦' },
     { path: '/achats', name: 'Achats', icon: '🛒' },
     { path: '/retours', name: 'Retours', icon: '↩️' },
   ];
+
+  const adminMenuItems = [
+    { path: '/categories', name: 'Categories', icon: '📋' },
+    { path: '/marques', name: 'Brands', icon: '🏷️' },
+    { path: '/statistics', name: 'Statistics', icon: '📈' },
+  ];
+
+  const menuItems = user?.role === 'ADMIN' 
+    ? [...baseMenuItems, ...adminMenuItems]
+    : baseMenuItems;
 
   const isActive = (path) => location.pathname === path;
 
