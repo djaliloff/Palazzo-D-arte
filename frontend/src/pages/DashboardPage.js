@@ -102,7 +102,18 @@ const DashboardPage = () => {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '2rem' }}>Dashboard</h1>
+      <h1 style={{ 
+        margin: 0, 
+        marginBottom: '2rem',
+        fontSize: '2rem', 
+        fontWeight: 700, 
+        color: '#1f2937',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent'
+      }}>
+        Dashboard
+      </h1>
       
       {/* Stats Grid */}
       <div style={{ 
