@@ -16,6 +16,11 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     if (endDate) dateFilter.dateAchat.lte = new Date(endDate);
   }
 
+  // Compute today's time window (local timezone)
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
   // Total sales (prix_total_remise après remises)
   const totalSales = await prisma.achat.aggregate({
     where: dateFilter,
@@ -36,6 +41,19 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
   // Net sales (sales - returns)
   const netSales = (totalSales._sum.prix_total_remise || 0) - (totalReturns._sum.montantRembourse || 0);
+
+  // Today's net sales
+  const todaysSalesAgg = await prisma.achat.aggregate({
+    where: { dateAchat: { gte: todayStart, lte: todayEnd } },
+    _sum: { prix_total_remise: true }
+  });
+  const todaysReturnsAgg = await prisma.retour.aggregate({
+    where: { dateRetour: { gte: todayStart, lte: todayEnd } },
+    _sum: { montantRembourse: true }
+  });
+  const todayNetSales = (todaysSalesAgg._sum.prix_total_remise || 0) - (todaysReturnsAgg._sum.montantRembourse || 0);
+  const todayReturns = (todaysReturnsAgg._sum.montantRembourse || 0);
+  const todayPurchases = await prisma.achat.count({ where: { dateAchat: { gte: todayStart, lte: todayEnd } } });
 
   // Total purchases
   const totalPurchases = await prisma.achat.count({
@@ -135,6 +153,9 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
   res.json({
     totalSales: totalSales._sum.prix_total_remise || 0,
     netSales,
+    todayNetSales,
+    todayReturns,
+    todayPurchases,
     totalPurchases,
     totalReturns: totalReturns._sum.montantRembourse || 0,
     activeClients,

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AchatForm from '../components/AchatForm';
+import ClientPickerModal from '../components/ClientPickerModal';
 
 const LancerAchatPage = () => {
   const navigate = useNavigate();
-  const [showForm, setShowForm] = useState(true);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [showClientModal, setShowClientModal] = useState(true);
 
   const handleFormSuccess = () => {
     // Rediriger vers la page Historique d'Achats après création réussie
@@ -17,7 +19,7 @@ const LancerAchatPage = () => {
   };
 
   return (
-    <div>
+    <div style={{ width: '100%', marginLeft: '-2rem', marginRight: '-2rem', paddingLeft: '2rem', paddingRight: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1 style={{ 
           margin: 0, 
@@ -32,8 +34,20 @@ const LancerAchatPage = () => {
         </h1>
       </div>
 
-      {showForm && (
+      {showClientModal && (
+        <ClientPickerModal
+          onClose={() => navigate('/achats')}
+          onSelect={(client) => {
+            setSelectedClient(client);
+            setShowClientModal(false);
+          }}
+        />
+      )}
+
+      {selectedClient && (
         <AchatForm
+          inline
+          initialClient={selectedClient}
           onSuccess={handleFormSuccess}
           onCancel={handleCancel}
         />

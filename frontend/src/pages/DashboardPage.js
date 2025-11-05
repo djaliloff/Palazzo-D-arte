@@ -86,20 +86,20 @@ const DashboardPage = () => {
 
   const statsCards = [
     {
-      title: 'Total Sales',
-      value: `${stats.totalSales.toLocaleString()} DA`,
+      title: "Today's Net Sales",
+      value: `${(stats.todayNetSales || 0).toLocaleString()} DA`,
       color: '#667eea',
       icon: '💰'
     },
     {
-      title: 'Total Purchases',
-      value: stats.totalPurchases,
+      title: "Today's Purchases",
+      value: stats.todayPurchases,
       color: '#4CAF50',
       icon: '🛒'
     },
     {
-      title: 'Total Returns',
-      value: `${stats.totalReturns.toLocaleString()} DA`,
+      title: "Today's Returns",
+      value: `${(stats.todayReturns || 0).toLocaleString()} DA`,
       color: '#f44336',
       icon: '↩️'
     },

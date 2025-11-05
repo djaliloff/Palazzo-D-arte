@@ -22,8 +22,8 @@ const formatStockDisplay = (product) => {
   return `${product.quantite_stock} ${product.uniteMesure}`;
 };
 
-const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullProduct }) => {
-  const defaultQty = product.venduParUnite ? '0.01' : '1';
+const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullProduct, viewMode = 'grid' }) => {
+  const defaultQty = product.venduParUnite ? '0.1' : '1';
   const [quantityInput, setQuantityInput] = useState(cartItem ? cartItem.quantite : defaultQty);
 
   useEffect(() => {
@@ -48,8 +48,8 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
     if (isNaN(qty) || qty <= 0) {
       return;
     }
-    // Ensure whole number for non-venduParUnite products
-    const finalQty = product.venduParUnite ? qty : Math.floor(qty);
+    // Ensure whole number for non-venduParUnite products, one-decimal for floats
+    const finalQty = product.venduParUnite ? Math.round(qty * 10) / 10 : Math.floor(qty);
     
     if (cartItem) {
       onUpdateCart(finalQty.toString());
@@ -64,8 +64,8 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
     }
   };
 
-  const minValue = product.venduParUnite ? 0.01 : 1;
-  const stepValue = product.venduParUnite ? 0.01 : 1;
+  const minValue = product.venduParUnite ? 0.1 : 1;
+  const stepValue = product.venduParUnite ? 0.1 : 1;
   // Le bouton "Acheter la totalité" est affiché si :
   // - Le produit est fractionnable (venduParUnite)
   // - Le produit a un poids défini (paquet complet)
@@ -73,14 +73,19 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
   // - Il y a au moins une pièce complète disponible (quantite_stock >= 1)
   const canBuyFull = product.venduParUnite && product.poids && product.prixTotal && product.quantite_stock >= 1;
 
+  const isList = viewMode === 'list';
+
   return (
     <div style={{
-      border: '2px solid #e5e7eb',
-      borderRadius: '12px',
-      padding: '1.25rem',
+      border: '1px solid #e5e7eb',
+      borderRadius: '10px',
+      padding: isList ? '0.6rem' : '0.75rem',
       background: 'white',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-      transition: 'all 0.2s ease'
+      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+      transition: 'all 0.15s ease',
+      display: isList ? 'flex' : 'block',
+      alignItems: isList ? 'center' : 'initial',
+      gap: isList ? '0.75rem' : '0'
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.borderColor = '#667eea';
@@ -98,11 +103,11 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
           src={product.image}
           alt={product.nom}
           style={{
-            width: '100%',
-            height: '150px',
+            width: isList ? '64px' : '100%',
+            height: isList ? '64px' : '110px',
             objectFit: 'contain',
             borderRadius: '6px',
-            marginBottom: '0.5rem',
+            marginBottom: isList ? '0' : '0.4rem',
             background: '#f5f5f5'
           }}
           onError={(e) => {
@@ -112,31 +117,31 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
       )}
       <div style={{ 
         fontWeight: 600, 
-        marginBottom: '0.5rem', 
-        fontSize: '1rem', 
+        marginBottom: isList ? '0.15rem' : '0.4rem', 
+        fontSize: '0.95rem', 
         color: '#1f2937',
-        lineHeight: '1.4'
+        lineHeight: '1.35'
       }}>
         {product.nom}
       </div>
       <div style={{ 
-        fontSize: '0.85rem', 
+        fontSize: '0.8rem', 
         color: '#6b7280', 
-        marginBottom: '0.75rem',
-        lineHeight: '1.5'
+        marginBottom: isList ? '0.4rem' : '0.5rem',
+        lineHeight: '1.45'
       }}>
         <div style={{ marginBottom: '0.25rem' }}>
           <strong>Reference:</strong> {product.reference} | <strong>Stock:</strong> {formatStockDisplay(product)}
       </div>
         {product.poids && (
           <div style={{ 
-            marginTop: '0.5rem', 
-            padding: '0.5rem',
+            marginTop: isList ? '0.25rem' : '0.35rem', 
+            padding: '0.35rem',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
             borderRadius: '6px',
             fontWeight: 600,
-            fontSize: '0.875rem'
+            fontSize: '0.8rem'
           }}>
             📦 Paquet: {product.poids} {product.uniteMesure} - {product.prixTotal} DA
           </div>
@@ -145,15 +150,18 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
       <div style={{ 
         fontWeight: 700, 
         color: '#667eea', 
-        marginBottom: '0.75rem',
-        fontSize: '1.1rem',
-        padding: '0.5rem',
+        marginBottom: isList ? '0.25rem' : '0.6rem',
+        fontSize: isList ? '0.9rem' : '0.95rem',
+        padding: isList ? '0.25rem 0.4rem' : '0.35rem',
         background: '#f3f4f6',
         borderRadius: '6px',
-        textAlign: 'center'
+        textAlign: 'center',
+        alignSelf: isList ? 'flex-start' : 'auto',
+        display: 'inline-block'
       }}>
         💰 {product.prixUnitaire} DA / {product.uniteMesure}
       </div>
+      {isList && (<div style={{ flex: 1 }} />)}
       
       {/* Bouton pour acheter la totalité du produit */}
       {canBuyFull && (
@@ -161,51 +169,51 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
           type="button"
           onClick={handleBuyFullProduct}
           style={{
-            width: '100%',
-            padding: '0.75rem',
+            width: isList ? 'auto' : '100%',
+            padding: isList ? '0.5rem 0.6rem' : '0.55rem 0.7rem',
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             color: 'white',
             border: 'none',
             borderRadius: '6px',
             cursor: 'pointer',
-            fontSize: '0.9rem',
+            fontSize: '0.8rem',
             fontWeight: 600,
-            marginBottom: '0.75rem',
+            marginBottom: isList ? '0' : '0.6rem',
             boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.15s ease'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 3px 6px rgba(16, 185, 129, 0.35)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
           }}
         >
-          🛒 Acheter la totalité ({product.poids} {product.uniteMesure} - {product.prixTotal} DA)
+          🛒 total ({product.poids} {product.uniteMesure} - {product.prixTotal} DA)
         </button>
       )}
 
       {/* Section pour acheter par quantité spécifiée */}
       <div style={{ 
-        padding: '0.75rem',
-        background: canBuyFull ? '#f8f9fa' : 'transparent',
+        padding: isList ? '0.2rem' : '0.6rem',
+        background: isList ? 'transparent' : (canBuyFull ? '#f8f9fa' : 'transparent'),
         borderRadius: '6px',
-        border: canBuyFull ? '1px solid #e9ecef' : 'none'
+        border: isList ? 'none' : (canBuyFull ? '1px solid #e9ecef' : 'none')
       }}>
-        {canBuyFull && (
+        {canBuyFull && !isList && (
           <div style={{ 
-            fontSize: '0.75rem', 
+            fontSize: '0.72rem', 
             color: '#666', 
-            marginBottom: '0.5rem',
+            marginBottom: '0.4rem',
             fontWeight: 500,
             textAlign: 'center'
           }}>
             Ou acheter par {product.uniteMesure.toLowerCase()}:
           </div>
         )}
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: isList ? 0 : '0.4rem' }}>
         <input
           type="number"
           value={quantityInput}
@@ -213,15 +221,17 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
           min={minValue}
           max={product.quantite_stock}
           step={stepValue}
+          inputMode="decimal"
           placeholder="Qty"
           style={{
-            flex: 1,
-              padding: '0.75rem',
-              border: '2px solid #e5e7eb',
+            flex: isList ? 'unset' : 1,
+              padding: isList ? '0.5rem' : '0.55rem',
+              border: '1.5px solid #e5e7eb',
               borderRadius: '8px',
-              fontSize: '0.95rem',
-              transition: 'all 0.2s ease',
-              outline: 'none'
+              fontSize: '0.85rem',
+              transition: 'all 0.15s ease',
+              outline: 'none',
+              width: isList ? '90px' : 'auto'
             }}
             onFocus={(e) => {
               e.target.style.borderColor = '#667eea';
@@ -230,29 +240,36 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
             onBlur={(e) => {
               e.target.style.borderColor = '#e5e7eb';
               e.target.style.boxShadow = 'none';
+            if (product.venduParUnite) {
+              const v = parseFloat(e.target.value);
+              if (!isNaN(v) && v > 0) {
+                const rounded = Math.round(v * 10) / 10;
+                setQuantityInput(rounded.toFixed(1));
+              }
+            }
           }}
         />
         <button
           type="button"
           onClick={handleAddToCartClick}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(102, 126, 234, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 3px 6px rgba(102, 126, 234, 0.25)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.2)';
             }}
           style={{
-              padding: '0.75rem 1.25rem',
+              padding: isList ? '0.5rem 0.8rem' : '0.55rem 0.9rem',
               background: cartItem ? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
             border: 'none',
               borderRadius: '8px',
             cursor: 'pointer',
-              fontSize: '0.9rem',
+              fontSize: '0.85rem',
               fontWeight: 600,
-              transition: 'all 0.2s ease',
+              transition: 'all 0.15s ease',
               boxShadow: '0 2px 4px rgba(102, 126, 234, 0.2)',
               whiteSpace: 'nowrap'
           }}
@@ -265,13 +282,14 @@ const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullPr
   );
 };
 
-const AchatForm = ({ onSuccess, onCancel }) => {
+const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }) => {
   const [step, setStep] = useState('client'); // 'client' or 'products'
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientSearch, setClientSearch] = useState('');
   const [showNewClientForm, setShowNewClientForm] = useState(false);
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
+  const [viewMode, setViewMode] = useState('grid');
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [productFilters, setProductFilters] = useState({
     search: '',
@@ -302,6 +320,13 @@ const AchatForm = ({ onSuccess, onCancel }) => {
     fetchMarques();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (initialClient) {
+      setSelectedClient(initialClient);
+      setStep('products');
+    }
+  }, [initialClient]);
 
   useEffect(() => {
     applyProductFilters();
@@ -387,8 +412,9 @@ const AchatForm = ({ onSuccess, onCancel }) => {
   };
 
   const addToCart = (product, quantite = null) => {
-    const qty = quantite || (product.venduParUnite ? '0.01' : '1');
-    const finalQty = product.venduParUnite ? parseFloat(qty) : Math.floor(parseFloat(qty));
+    const qty = quantite || (product.venduParUnite ? '0.1' : '1');
+    const parsed = parseFloat(qty);
+    const finalQty = product.venduParUnite ? Math.round(parsed * 10) / 10 : Math.floor(parsed);
     
     if (isNaN(finalQty) || finalQty <= 0) {
       return;
@@ -471,6 +497,8 @@ const AchatForm = ({ onSuccess, onCancel }) => {
           // Ensure whole number for non-venduParUnite products
           if (!item.venduParUnite) {
             qty = Math.floor(qty);
+          } else {
+            qty = Math.round(qty * 10) / 10;
           }
           if (qty > item.maxQuantite) {
             qty = item.maxQuantite;
@@ -556,89 +584,51 @@ const AchatForm = ({ onSuccess, onCancel }) => {
     (client.email?.toLowerCase().includes(clientSearch.toLowerCase())) ||
     (client.telephone?.includes(clientSearch))
   );
+  const limitedClients = filteredClients.slice(0, 20);
 
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.85)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '2rem'
-    }}
-    onClick={onCancel}
-    >
-      <div style={{
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-        padding: '2.5rem',
-        borderRadius: '24px',
-        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-        maxWidth: '1200px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        position: 'relative'
-      }}
-      onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close Button */}
+  const innerContainer = (
+      <div>
+        {!inline && (
           <button
             onClick={onCancel}
             style={{
-            position: 'absolute',
-            top: '1.5rem',
-            right: '1.5rem',
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(10px)',
-            border: '2px solid rgba(0, 0, 0, 0.1)',
-            borderRadius: '50%',
-            width: '44px',
-            height: '44px',
-            color: '#1f2937',
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              border: '2px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '50%',
+              width: '44px',
+              height: '44px',
+              color: '#1f2937',
               fontSize: '1.5rem',
               cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10,
-            transition: 'all 0.3s ease',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#ef4444';
-            e.currentTarget.style.color = 'white';
-            e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-            e.currentTarget.style.color = '#1f2937';
-            e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#ef4444';
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.color = '#1f2937';
+              e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
             }}
           >
             ✕
           </button>
+        )}
 
-        <div style={{ marginBottom: '2rem' }}>
-          <h2 style={{ 
-            margin: 0,
-            fontSize: '2rem',
-            fontWeight: 800,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            letterSpacing: '-0.02em'
-          }}>
-            Create New Purchase
-          </h2>
-        </div>
+        
 
         {error && (
           <div style={{
@@ -677,17 +667,17 @@ const AchatForm = ({ onSuccess, onCancel }) => {
 
             {/* Clients List */}
             <div style={{ 
-              maxHeight: '300px', 
+              maxHeight: '260px', 
               overflowY: 'auto', 
-              marginBottom: '1rem',
+              marginBottom: '0.75rem',
               border: '1px solid #ddd',
               borderRadius: '6px',
-              padding: '0.5rem'
+              padding: '0.25rem'
             }}>
-              {filteredClients.length === 0 ? (
+              {limitedClients.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>No clients found</p>
               ) : (
-                filteredClients.map(client => (
+                limitedClients.map(client => (
                   <div
                     key={client.id}
                     onClick={() => {
@@ -695,23 +685,47 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                       setStep('products');
                     }}
                     style={{
-                      padding: '1rem',
-                      border: selectedClient?.id === client.id ? '2px solid #667eea' : '1px solid #ddd',
-                      borderRadius: '6px',
-                      marginBottom: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      border: selectedClient?.id === client.id ? '2px solid #667eea' : '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      marginBottom: '0.35rem',
                       cursor: 'pointer',
                       background: selectedClient?.id === client.id ? '#f0f4ff' : 'white',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#667eea';
+                      e.currentTarget.style.boxShadow = '0 2px 6px rgba(102, 126, 234, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = selectedClient?.id === client.id ? '#667eea' : '#e5e7eb';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    <div style={{ fontWeight: 500 }}>{client.prenom} {client.nom}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                      {client.email || client.telephone || '—'}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: 1.25 }}>
+                        {client.prenom} {client.nom}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                        {client.email || client.telephone || '—'}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#667eea', fontWeight: 600 }}>
+                      Select →
                     </div>
                   </div>
                 ))
               )}
             </div>
+            {filteredClients.length > 20 && (
+              <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#6b7280', marginBottom: '1rem' }}>
+                Showing 20 of {filteredClients.length}. Refine your search to see others.
+              </div>
+            )}
 
             {/* Create New Client Button */}
             <button
@@ -864,6 +878,23 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                   Change Client
                 </button>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>View:</span>
+                <button
+                  type="button"
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    background: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  {viewMode === 'grid' ? 'List' : 'Grid'}
+                </button>
+              </div>
             </div>
 
             {/* Product Filters */}
@@ -912,15 +943,13 @@ const AchatForm = ({ onSuccess, onCancel }) => {
             </div>
 
             {/* Products Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-              gap: '1rem',
-              marginBottom: '2rem',
-              maxHeight: '400px',
-              overflowY: 'auto',
-              padding: '0.5rem'
-            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr',
+                gap: viewMode === 'grid' ? '0.75rem' : '0.5rem',
+                marginBottom: '1.5rem',
+                padding: '0.5rem'
+              }}>
               {filteredProducts.map(product => {
                 const cartItem = cart.find(item => item.produitId === product.id);
                 return (
@@ -931,6 +960,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                     onAddToCart={(qty) => addToCart(product, qty)}
                     onUpdateCart={(qty) => updateCartItem(product.id, 'quantite', qty)}
                     onAddFullProduct={(poids, prixTotal) => addFullProductToCart(product.id, poids, prixTotal)}
+                    viewMode={viewMode}
                   />
                 );
               })}
@@ -964,9 +994,16 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                         type="number"
                         value={item.quantite}
                         onChange={(e) => updateCartItem(item.produitId, 'quantite', e.target.value)}
-                        min={item.venduParUnite ? 0.01 : 1}
+                        onBlur={(e) => {
+                          const v = parseFloat(e.target.value);
+                          if (!isNaN(v)) {
+                            const normalized = item.venduParUnite ? (Math.round(v * 10) / 10).toFixed(1) : Math.floor(v).toString();
+                            updateCartItem(item.produitId, 'quantite', normalized);
+                          }
+                        }}
+                        min={item.venduParUnite ? 0.1 : 1}
                         max={item.maxQuantite}
-                        step={item.venduParUnite ? 0.01 : 1}
+                        step={item.venduParUnite ? 0.1 : 1}
                         style={{
                           width: '60px',
                           margin: '0 0.25rem',
@@ -1029,7 +1066,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                   min="0"
                     placeholder="0.00"
                     style={{ 
-                      width: '100%', 
+                      width: '90%', 
                       padding: '0.875rem 1rem', 
                       border: '2px solid #e5e7eb', 
                       borderRadius: '8px',
@@ -1058,7 +1095,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
                   min="0"
                     placeholder="0.00"
                     style={{ 
-                      width: '100%', 
+                      width: '90%', 
                       padding: '0.875rem 1rem', 
                       border: '2px solid #e5e7eb', 
                       borderRadius: '8px',
@@ -1082,7 +1119,7 @@ const AchatForm = ({ onSuccess, onCancel }) => {
               <div>
                 <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>📊 Final Total</label>
                 <div style={{
-                  padding: '1.25rem',
+                  padding: '0.75rem',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   borderRadius: '10px',
                   fontSize: '1.5rem',
@@ -1160,6 +1197,57 @@ const AchatForm = ({ onSuccess, onCancel }) => {
             </div>
           </form>
         )}
+      </div>
+  );
+
+  if (inline) {
+    return (
+      <div style={{
+        background: 'transparent',
+        padding: '0',
+        borderRadius: '0',
+        maxWidth: 'none',
+        width: '100%',
+        position: 'relative'
+      }}>
+        
+        {innerContainer}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.85)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '2rem'
+    }}
+    onClick={onCancel}
+    >
+      <div style={{
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+        padding: '2.5rem',
+        borderRadius: '24px',
+        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative'
+      }}
+      onClick={(e) => e.stopPropagation()}
+      >
+        
+        {innerContainer}
       </div>
     </div>
   );

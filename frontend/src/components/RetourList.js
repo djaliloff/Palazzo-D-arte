@@ -333,7 +333,7 @@ const RetourList = () => {
               fontSize: '0.9rem', 
               color: '#6b7280' 
             }}>
-              Showing <strong style={{ color: '#667eea' }}>{filteredRetours.length}</strong> of <strong style={{ color: '#667eea' }}>{retours.length}</strong> returns
+              Showing <strong style={{ color: '#667eea' }}>{Math.min(filteredRetours.length, 50)}</strong> of <strong style={{ color: '#667eea' }}>{retours.length}</strong> returns
             </p>
           </div>
         </div>
@@ -604,7 +604,7 @@ const RetourList = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredRetours.map((retour, index) => {
+                {filteredRetours.slice(0, 50).map((retour, index) => {
                   const typeBadge = getTypeBadgeColor(retour.typeRetour);
                   const clientTypeBadge = getClientTypeBadgeColor(retour.client?.type);
                   return (

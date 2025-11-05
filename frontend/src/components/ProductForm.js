@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import PrettyDatePicker from './PrettyDatePicker';
 
 const ProductForm = ({ product, onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -571,19 +572,11 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
                 Date d'expiration pour le stock initial *
               </label>
-              <input
-                type="date"
-                name="date_expiration"
+              <PrettyDatePicker
                 value={formData.date_expiration || ''}
-                onChange={handleChange}
+                onChange={(v) => handleChange({ target: { name: 'date_expiration', value: v } })}
                 required={formData.perissable && parseFloat(formData.quantite_stock) > 0}
                 min={new Date().toISOString().split('T')[0]}
-                style={{ 
-                  width: '100%', 
-                  padding: '0.75rem', 
-                  border: '1px solid #ddd', 
-                  borderRadius: '6px' 
-                }}
               />
               <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#f59e0b' }}>
                 ⏰ Une date d'expiration est requise pour créer le lot de stock initial

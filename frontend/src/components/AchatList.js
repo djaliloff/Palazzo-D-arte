@@ -10,7 +10,8 @@ const AchatList = () => {
   const [selectedAchat, setSelectedAchat] = useState(null);
   const [filters, setFilters] = useState({
     search: '',
-    statut: '',
+    dateFrom: '',
+    dateTo: '',
     clientId: ''
   });
   const [showVersementModal, setShowVersementModal] = useState(false);
@@ -39,7 +40,6 @@ const AchatList = () => {
     try {
       setLoading(true);
       const params = {};
-      if (filters.statut) params.statut = filters.statut;
       if (filters.clientId) params.clientId = filters.clientId;
 
       const response = await api.get('/achats', { params });
@@ -67,6 +67,18 @@ const AchatList = () => {
       );
     }
 
+    // Date range filter (client-side)
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom);
+      filtered = filtered.filter(a => new Date(a.dateAchat) >= from);
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      // include entire day
+      to.setHours(23,59,59,999);
+      filtered = filtered.filter(a => new Date(a.dateAchat) <= to);
+    }
+
     setFilteredAchats(filtered);
   };
 
@@ -80,7 +92,8 @@ const AchatList = () => {
   const handleClearFilters = () => {
     setFilters({
       search: '',
-      statut: '',
+      dateFrom: '',
+      dateTo: '',
       clientId: ''
     });
     setTimeout(() => {
@@ -887,7 +900,7 @@ const AchatList = () => {
         boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
         border: '1px solid #e5e7eb'
       }}>
-        <div style={{ 
+      <div style={{ 
           marginBottom: '1.5rem',
           paddingBottom: '1rem',
           borderBottom: '2px solid #e5e7eb'
@@ -906,7 +919,7 @@ const AchatList = () => {
               fontSize: '0.9rem', 
               color: '#6b7280' 
             }}>
-              Showing <strong style={{ color: '#667eea' }}>{filteredAchats.length}</strong> of <strong style={{ color: '#667eea' }}>{achats.length}</strong> purchases
+              Showing <strong style={{ color: '#667eea' }}>{Math.min(filteredAchats.length, 50)}</strong> of <strong style={{ color: '#667eea' }}>{achats.length}</strong> purchases
             </p>
           </div>
         </div>
@@ -962,46 +975,26 @@ const AchatList = () => {
               />
             </div>
             <div style={{ flex: '0 1 180px', minWidth: '150px' }}>
-              <label style={{ 
-                display: 'block', 
-                marginBottom: '0.5rem', 
-                fontWeight: 600, 
-                fontSize: '0.9rem',
-                color: '#374151'
-              }}>
-                📊 Statut
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>
+                📅 Date From
               </label>
-              <select
-                value={filters.statut}
-                onChange={(e) => {
-                  handleFilterChange('statut', e.target.value);
-                  fetchAchats();
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.875rem 1rem',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  background: 'white',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  outline: 'none'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#667eea';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#e5e7eb';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value="">Tous</option>
-                <option value="VALIDE">Valide</option>
-                <option value="RETOURNE_PARTIEL">Retourné Partiel</option>
-                <option value="RETOURNE_TOTAL">Retourné Total</option>
-              </select>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                style={{ width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem' }}
+              />
+            </div>
+            <div style={{ flex: '0 1 180px', minWidth: '150px' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>
+                📅 Date To
+              </label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                style={{ width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '0.95rem' }}
+              />
             </div>
             <div style={{ flex: '0 1 180px', minWidth: '150px' }}>
               <label style={{ 
@@ -1048,7 +1041,7 @@ const AchatList = () => {
               </select>
             </div>
           </div>
-          {(filters.search || filters.statut || filters.clientId) && (
+          {(filters.search || filters.dateFrom || filters.dateTo || filters.clientId) && (
             <div style={{
               display: 'flex',
               gap: '0.75rem',
@@ -1072,16 +1065,14 @@ const AchatList = () => {
                   Search: {filters.search}
                 </span>
               )}
-              {filters.statut && (
-                <span style={{
-                  background: '#10b981',
-                  color: 'white',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '12px',
-                  fontSize: '0.8rem',
-                  fontWeight: 500
-                }}>
-                  Status: {filters.statut}
+              {filters.dateFrom && (
+                <span style={{ background: '#10b981', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 500 }}>
+                  From: {filters.dateFrom}
+                </span>
+              )}
+              {filters.dateTo && (
+                <span style={{ background: '#10b981', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 500 }}>
+                  To: {filters.dateTo}
                 </span>
               )}
               {filters.clientId && (
@@ -1180,7 +1171,7 @@ const AchatList = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredAchats.map((achat, index) => {
+                {filteredAchats.slice(0, 50).map((achat, index) => {
                   const statusBadge = getStatusBadgeColor(achat.statut);
                   const typeBadge = getClientTypeBadgeColor(achat.client?.type);
                   return (

@@ -42,11 +42,12 @@ const ClientForm = ({ client, onSuccess, onCancel }) => {
     setMessage('');
 
     try {
+      let response;
       if (client) {
-        await api.put(`/clients/${client.id}`, formData);
+        response = await api.put(`/clients/${client.id}`, formData);
         setMessage('Client updated successfully!');
       } else {
-        await api.post('/clients', formData);
+        response = await api.post('/clients', formData);
         setMessage('Client created successfully!');
       }
       
@@ -65,8 +66,8 @@ const ClientForm = ({ client, onSuccess, onCancel }) => {
       
       if (onSuccess) {
         setTimeout(() => {
-          onSuccess();
-        }, 1000);
+          onSuccess(response?.data);
+        }, 300);
       } else {
         window.location.reload();
       }

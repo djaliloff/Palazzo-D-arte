@@ -131,7 +131,7 @@ const ClientList = ({ onEdit, refreshKey }) => {
             fontSize: '0.9rem', 
             color: '#6b7280' 
           }}>
-            Showing <strong style={{ color: '#667eea' }}>{filteredClients.length}</strong> of <strong style={{ color: '#667eea' }}>{clients.length}</strong> clients
+            Showing <strong style={{ color: '#667eea' }}>{Math.min(filteredClients.length, 50)}</strong> of <strong style={{ color: '#667eea' }}>{clients.length}</strong> clients
           </p>
         </div>
       </div>
@@ -394,7 +394,7 @@ const ClientList = ({ onEdit, refreshKey }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map((client, index) => (
+              {filteredClients.slice(0, 50).map((client, index) => (
                 <tr 
                   key={client.id} 
                   style={{ 

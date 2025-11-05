@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import '../styles/TopNavbar.css';
@@ -9,12 +9,32 @@ const TopNavbar = () => {
   const [expiringLots, setExpiringLots] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const notificationRef = useRef(null);
 
   useEffect(() => {
     if (showNotifications) {
       fetchAllNotifications();
     }
   }, [showNotifications]);
+
+  // Fetch counts on initial mount and when window gains focus
+  useEffect(() => {
+    fetchAllNotifications();
+    const handleFocus = () => fetchAllNotifications();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  // Close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchAllNotifications = async () => {
     try {
@@ -66,10 +86,10 @@ const TopNavbar = () => {
           className="icon-button" 
           onClick={() => setShowNotifications(!showNotifications)}
           style={{ position: 'relative' }}
+          ref={notificationRef}
         >
           <span className="icon" style={{ fontSize: '1.4rem' }}>🔔</span>
-          {totalNotificationCount > 0 && (
-            <span style={{
+          <span style={{
               position: 'absolute',
               top: '-6px',
               right: '-6px',
@@ -89,7 +109,6 @@ const TopNavbar = () => {
             }}>
               {totalNotificationCount > 9 ? '9+' : totalNotificationCount}
             </span>
-          )}
           {showNotifications && (
             <div className="notifications-dropdown" style={{ 
               maxHeight: '600px', 

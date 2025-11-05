@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import PrettyDatePicker from './PrettyDatePicker';
 
 const AddStockForm = ({ onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -279,20 +280,12 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
                 Date d'expiration {selectedProduct?.perissable ? '*' : '(optionnelle)'}
               </label>
-            <input
-              type="date"
-              name="date_expiration"
+            <PrettyDatePicker
               value={formData.date_expiration}
-              onChange={handleChange}
-                required={selectedProduct?.perissable && formData.quantite_stock_ajout}
-                min={new Date().toISOString().split('T')[0]}
-                style={{ 
-                  width: '100%', 
-                  padding: '0.75rem', 
-                  border: `1px solid ${selectedProduct?.perissable && formData.quantite_stock_ajout && !formData.date_expiration ? '#ef4444' : '#ddd'}`, 
-                  borderRadius: '6px' 
-                }}
-              />
+              onChange={(v) => handleChange({ target: { name: 'date_expiration', value: v } })}
+              required={selectedProduct?.perissable && formData.quantite_stock_ajout}
+              min={new Date().toISOString().split('T')[0]}
+            />
               {selectedProduct?.perissable && (
                 <div style={{ 
                   marginTop: '0.5rem', 
