@@ -35,6 +35,7 @@ const ProductsPage = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -50,7 +51,7 @@ const ProductsPage = () => {
           Products
         </h1>
         {!showForm && !showAddStockForm && (
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <button
               onClick={() => setShowAddStockForm(true)}
               onMouseEnter={(e) => {
@@ -77,7 +78,7 @@ const ProductsPage = () => {
                 gap: '0.5rem'
               }}
             >
-              📦 Add to Stock/Dépôt
+              📦 Add to Stock
             </button>
             <button
               onClick={handleAdd}

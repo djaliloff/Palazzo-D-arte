@@ -1,11 +1,31 @@
 import prisma from '../config/db.js';
 import { logger } from '../utils/logger.js';
 import { asyncHandler } from '../middlewares/error.middleware.js';
+import { retirerStock } from '../services/stock.service.js';
 
 /**
  * Helper function to recalculate stock from lots
- * For perishable products: only counts non-expired lots
- * For non-perishable products: counts all lots
+ * 
+ * STOCK RECALCULATION LOGIC:
+ * ============================================================
+ * This function recalculates quantite_stock based on LotDeStock records.
+ * 
+ * For perishable products (perissable = true):
+ * - Only counts lots that are NOT expired (date_expiration > now)
+ * - Expired lots are excluded from available stock
+ * - This ensures quantite_stock reflects only sellable inventory
+ * 
+ * For non-perishable products (perissable = false):
+ * - Counts ALL lots regardless of expiration date
+ * - Since non-perishable products don't have expiration dates,
+ *   all lots are considered available
+ * 
+ * The recalculated value is then stored in quantite_stock to keep
+ * it synchronized with the actual lot data.
+ * ============================================================
+ * 
+ * @param {number} produitId - The ID of the product to recalculate stock for
+ * @returns {Promise<number>} - The recalculated stock quantity
  */
 const recalculerStockFromLots = async (produitId) => {
   const produit = await prisma.produit.findUnique({
@@ -24,6 +44,7 @@ const recalculerStockFromLots = async (produitId) => {
 
   if (produit.perissable) {
     // For perishable products: sum only non-expired lots
+    // Expired products should not be counted as available stock
     for (const lot of produit.lot_de_stock) {
       if (lot.date_expiration && new Date(lot.date_expiration) > now) {
         totalStock += lot.quantite;
@@ -31,12 +52,15 @@ const recalculerStockFromLots = async (produitId) => {
     }
   } else {
     // For non-perishable products: sum all lots
+    // Non-perishable products don't have expiration dates,
+    // so all lots are considered available
     for (const lot of produit.lot_de_stock) {
       totalStock += lot.quantite;
     }
   }
 
-  // Update product stock
+  // Update product's quantite_stock to match the calculated value
+  // This ensures quantite_stock always reflects the actual available stock
   await prisma.produit.update({
     where: { id: parseInt(produitId) },
     data: {
@@ -280,9 +304,9 @@ export const createProduct = asyncHandler(async (req, res) => {
       categorieId: parseInt(categorieId),
       seuilAlerte: seuilAlerte || 5,
       quantite_stock: 0, // Will be calculated from lots
-      quantite_depos: parseFloat(req.body.quantite_depos) || 0,
       venduParUnite: venduParUnite !== undefined ? venduParUnite : true,
-      perissable: perissable !== undefined ? Boolean(perissable) : false
+      perissable: perissable !== undefined ? Boolean(perissable) : false,
+      quantite_depos: 0 // Default to 0, not used in application
     },
     include: {
       marque: true,
@@ -344,7 +368,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (data.prixTotal !== undefined) data.prixTotal = parseFloat(data.prixTotal);
   if (data.poids !== undefined) data.poids = data.poids ? parseFloat(data.poids) : null;
   if (data.seuilAlerte !== undefined) data.seuilAlerte = parseFloat(data.seuilAlerte);
-  if (data.quantite_depos !== undefined) data.quantite_depos = parseFloat(data.quantite_depos);
 
   const produit = await prisma.produit.update({
     where: { id: parseInt(id) },
@@ -476,14 +499,34 @@ export const getLowStockProducts = asyncHandler(async (req, res) => {
 });
 
 /**
- * Add stock and/or depot quantities to a product
+ * Add stock to a product
  * POST /api/products/add-stock
+ * 
+ * STOCK ADDITION LOGIC:
+ * ============================================================
+ * This function handles adding stock to products using the lot system.
+ * 
+ * quantite_stock (Current Available Stock):
+ * - Updated through the lot system
+ * - For perishable products: creates a new LotDeStock with expiration date
+ * - For non-perishable products: creates a LotDeStock without expiration date
+ * - quantite_stock is recalculated from all lots after adding
+ * 
+ * For perishable products:
+ * - Requires a valid future expiration date
+ * - Creates a new lot with the expiration date
+ * - quantite_stock is recalculated to include only non-expired lots
+ * 
+ * For non-perishable products:
+ * - No expiration date required
+ * - Creates a lot without expiration date
+ * - quantite_stock is recalculated from all lots
+ * ============================================================
  */
 export const addStockToProduct = asyncHandler(async (req, res) => {
   const {
     produitId,
     quantite_stock_ajout,
-    quantite_depos_ajout,
     date_expiration
   } = req.body;
 
@@ -494,10 +537,10 @@ export const addStockToProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!quantite_stock_ajout && !quantite_depos_ajout) {
+  if (!quantite_stock_ajout || quantite_stock_ajout <= 0) {
     return res.status(400).json({
       error: 'Validation Error',
-      message: 'At least one quantity (stock or depot) must be provided'
+      message: 'Stock quantity must be provided and greater than 0'
     });
   }
 
@@ -513,48 +556,39 @@ export const addStockToProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  // Update depot quantity if provided
-  let updateData = {};
-  if (quantite_depos_ajout) {
-    const newQuantiteDepos = (produit.quantite_depos || 0) + parseFloat(quantite_depos_ajout);
-    updateData.quantite_depos = newQuantiteDepos;
+  // Validate expiration date for perishable products
+  if (produit.perissable && !date_expiration) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Expiration date is required for perishable products'
+    });
   }
 
-  // Add stock using lot system if stock quantity is provided
-  if (quantite_stock_ajout) {
-    // Validate expiration date for perishable products
-    if (produit.perissable && !date_expiration) {
+  // Validate that expiration date is in the future
+  if (produit.perissable && date_expiration) {
+    const expDate = new Date(date_expiration);
+    if (isNaN(expDate.getTime()) || expDate <= new Date()) {
       return res.status(400).json({
         error: 'Validation Error',
-        message: 'Expiration date is required for perishable products'
+        message: 'Valid future expiration date is required for perishable products'
       });
     }
-
-    if (produit.perissable && date_expiration) {
-      const expDate = new Date(date_expiration);
-      if (isNaN(expDate.getTime()) || expDate <= new Date()) {
-        return res.status(400).json({
-          error: 'Validation Error',
-          message: 'Valid future expiration date is required for perishable products'
-        });
-      }
-    }
-
-    // Create lot
-    await prisma.lotDeStock.create({
-      data: {
-        produitId: parseInt(produitId),
-        quantite: parseFloat(quantite_stock_ajout),
-        date_expiration: date_expiration ? new Date(date_expiration) : null
-      }
-    });
-
-    // Recalculate stock from lots
-    await recalculerStockFromLots(produitId);
-  } else if (quantite_depos_ajout) {
-    // If only depot is updated, still recalculate stock to ensure it's accurate
-    await recalculerStockFromLots(produitId);
   }
+
+  // Create a new lot for this stock addition
+  // For perishable products: lot has expiration date
+  // For non-perishable products: lot has no expiration date (null)
+  await prisma.lotDeStock.create({
+    data: {
+      produitId: parseInt(produitId),
+      quantite: parseFloat(quantite_stock_ajout),
+      date_expiration: date_expiration ? new Date(date_expiration) : null
+    }
+  });
+
+  // Recalculate quantite_stock from all lots
+  // This ensures quantite_stock reflects the actual available stock
+  await recalculerStockFromLots(produitId);
 
   // Get updated product
   const updatedProduit = await prisma.produit.findUnique({
@@ -570,7 +604,99 @@ export const addStockToProduct = asyncHandler(async (req, res) => {
     }
   });
 
-  logger.success(`Stock added to product: ${updatedProduit.nom} (Stock: +${quantite_stock_ajout || 0}, Depot: +${quantite_depos_ajout || 0})`);
+  logger.success(`Stock added to product: ${updatedProduit.nom} (Stock: +${quantite_stock_ajout || 0})`);
   res.json(updatedProduit);
+});
+
+/**
+ * Withdraw stock from a product
+ * POST /api/products/:id/retirer-stock
+ * 
+ * This endpoint handles stock withdrawal for both perishable and non-perishable products.
+ * 
+ * For non-perishable products:
+ * - Simply subtracts the requested quantity from quantite_stock
+ * 
+ * For perishable products:
+ * - Uses FEFO (First Expired First Out) logic
+ * - Withdraws from lots with earliest expiration dates first
+ * - Updates or deletes lots as needed
+ * - Recalculates quantite_stock from remaining lots
+ * 
+ * Request body:
+ * {
+ *   "quantite": number  // The quantity to withdraw
+ * }
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "message": "Successfully withdrew X units from stock",
+ *   "product": {...},  // Updated product with current stock
+ *   "withdrawnQuantity": number,
+ *   "remainingStock": number,
+ *   "lotsModified": [...]  // Only for perishable products
+ * }
+ */
+export const retirerStockProduit = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { quantite } = req.body;
+
+  // Validate input
+  if (!quantite || quantite <= 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Quantity must be provided and greater than 0'
+    });
+  }
+
+  // Validate quantity is a number
+  const quantiteDemandee = parseFloat(quantite);
+  if (isNaN(quantiteDemandee)) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Quantity must be a valid number'
+    });
+  }
+
+  try {
+    // Call the service function to handle stock withdrawal
+    const result = await retirerStock(id, quantiteDemandee);
+
+    logger.success(
+      `Stock withdrawn from product ID ${id}: ${quantiteDemandee} units (Remaining: ${result.remainingStock})`
+    );
+
+    // Return success response
+    res.json(result);
+  } catch (error) {
+    // Handle specific error messages from the service
+    if (
+      error.message.includes('Product not found') ||
+      error.message.includes('not active')
+    ) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: error.message
+      });
+    }
+
+    if (
+      error.message.includes('Insufficient stock') ||
+      error.message.includes('Quantity must')
+    ) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: error.message
+      });
+    }
+
+    // Generic error handler
+    logger.error(`Error withdrawing stock from product ${id}:`, error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to withdraw stock. Please try again later.'
+    });
+  }
 });
 

@@ -6,7 +6,6 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
     produitId: '',
     quantite_stock_ajout: '',
-    quantite_depos_ajout: '',
     date_expiration: ''
   });
   const [products, setProducts] = useState([]);
@@ -60,8 +59,8 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
       return;
     }
 
-    if (!formData.quantite_stock_ajout && !formData.quantite_depos_ajout) {
-      setError('Veuillez entrer au moins une quantité à ajouter (stock ou dépôt)');
+    if (!formData.quantite_stock_ajout) {
+      setError('Veuillez entrer une quantité à ajouter au stock');
       setLoading(false);
       return;
     }
@@ -77,7 +76,6 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
       const data = {
         produitId: parseInt(formData.produitId),
         quantite_stock_ajout: parseFloat(formData.quantite_stock_ajout) || 0,
-        quantite_depos_ajout: parseFloat(formData.quantite_depos_ajout) || 0,
         date_expiration: formData.date_expiration ? new Date(formData.date_expiration).toISOString() : null
       };
 
@@ -171,7 +169,7 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
             WebkitTextFillColor: 'transparent',
             letterSpacing: '-0.02em'
           }}>
-            Ajouter au Stock / Dépôt
+            Ajouter au Stock
           </h2>
         </div>
 
@@ -207,7 +205,7 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
               <option value="">Sélectionner un produit</option>
               {products.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.reference} - {p.nom} (Stock: {p.quantite_stock || 0}, Dépôt: {p.quantite_depos || 0})
+                  {p.reference} - {p.nom} (Stock: {p.quantite_stock || 0})
                 </option>
               ))}
             </select>
@@ -220,7 +218,6 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
                 fontSize: '0.9rem'
               }}>
                 <div><strong>Stock actuel:</strong> {selectedProduct.quantite_stock || 0} {selectedProduct.uniteMesure}</div>
-                <div><strong>Dépôt actuel:</strong> {selectedProduct.quantite_depos || 0} {selectedProduct.uniteMesure}</div>
                 {selectedProduct.perissable && (
                   <div style={{ 
                     marginTop: '0.5rem', 
@@ -252,25 +249,6 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
             {selectedProduct && formData.quantite_stock_ajout && (
               <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
                 Nouveau stock: {(selectedProduct.quantite_stock || 0) + parseFloat(formData.quantite_stock_ajout)} {selectedProduct.uniteMesure}
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Quantité à ajouter au Dépôt</label>
-            <input
-              type="number"
-              name="quantite_depos_ajout"
-              value={formData.quantite_depos_ajout}
-              onChange={handleChange}
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-            />
-            {selectedProduct && formData.quantite_depos_ajout && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
-                Nouveau dépôt: {(selectedProduct.quantite_depos || 0) + parseFloat(formData.quantite_depos_ajout)} {selectedProduct.uniteMesure}
               </div>
             )}
           </div>
@@ -348,7 +326,7 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
             )}
             <button
               type="submit"
-              disabled={loading || (!formData.quantite_stock_ajout && !formData.quantite_depos_ajout)}
+              disabled={loading || !formData.quantite_stock_ajout}
               style={{
                 padding: '1rem 2rem',
                 border: 'none',
@@ -356,7 +334,7 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: (loading || (!formData.quantite_stock_ajout && !formData.quantite_depos_ajout)) ? 0.6 : 1,
+                opacity: (loading || !formData.quantite_stock_ajout) ? 0.6 : 1,
                 fontSize: '1rem',
                 fontWeight: 600,
                 transition: 'all 0.3s ease',
@@ -366,13 +344,13 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
                 gap: '0.5rem'
               }}
               onMouseEnter={(e) => {
-                if (!loading && (formData.quantite_stock_ajout || formData.quantite_depos_ajout)) {
+                if (!loading && formData.quantite_stock_ajout) {
                   e.currentTarget.style.transform = 'translateY(-3px)';
                   e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.5)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!loading && (formData.quantite_stock_ajout || formData.quantite_depos_ajout)) {
+                if (!loading && formData.quantite_stock_ajout) {
                   e.currentTarget.style.transform = 'translateY(0)';
                   e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
                 }
@@ -386,7 +364,7 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
               ) : (
                 <>
                   <span>➕</span>
-                  <span>Ajouter au Stock/Dépôt</span>
+                  <span>Ajouter au Stock</span>
                 </>
               )}
             </button>

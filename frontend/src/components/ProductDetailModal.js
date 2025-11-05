@@ -1,7 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
+import ConfirmModal from './ConfirmModal';
 
 const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   if (!product) return null;
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (onDelete) {
+      onDelete(product);
+      onClose();
+    }
+    setShowDeleteConfirm(false);
+  };
 
   const formatStockDisplay = (product) => {
     if (product.poids && product.uniteMesure === 'KG' && product.venduParUnite) {
@@ -217,12 +232,7 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
               )}
               {onDelete && (
                 <button
-                  onClick={() => {
-                    if (window.confirm(`Are you sure you want to delete "${product.nom}"?`)) {
-                      onDelete(product);
-                      onClose();
-                    }
-                  }}
+                  onClick={handleDeleteClick}
                   style={{
                     width: '100%',
                     padding: '1rem',
@@ -359,9 +369,6 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                 padding: '2rem',
                 borderRadius: '16px',
                 border: `2px solid ${product.quantite_stock <= product.seuilAlerte ? '#fca5a5' : '#6ee7b7'}`,
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '1.5rem',
                 boxShadow: `0 4px 20px ${product.quantite_stock <= product.seuilAlerte ? 'rgba(252, 165, 165, 0.2)' : 'rgba(110, 231, 183, 0.2)'}`,
                 position: 'relative',
                 overflow: 'hidden'
@@ -401,33 +408,6 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                     lineHeight: '1.2'
                   }}>
                     {formatStockDisplay(product)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <span style={{ fontSize: '1.75rem' }}>🏭</span>
-                    <span style={{
-                      color: product.quantite_stock <= product.seuilAlerte ? '#991b1b' : '#065f46',
-                      fontWeight: 700,
-                      fontSize: '0.95rem',
-                      letterSpacing: '0.5px',
-                      textTransform: 'uppercase'
-                    }}>
-                      Dépôt
-                    </span>
-                  </div>
-                  <div style={{
-                    fontSize: '2rem',
-                    fontWeight: 800,
-                    color: product.quantite_stock <= product.seuilAlerte ? '#991b1b' : '#065f46',
-                    lineHeight: '1.2'
-                  }}>
-                    {product.quantite_depos || 0} {product.uniteMesure}
                   </div>
                 </div>
               </div>
@@ -837,6 +817,20 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDeleteConfirm}
+          title="Supprimer le produit"
+          message={`Êtes-vous sûr de vouloir supprimer "${product.nom}" ? Cette action est irréversible.`}
+          confirmText="Supprimer"
+          cancelText="Annuler"
+          type="danger"
+        />
+      )}
     </div>
   );
 };

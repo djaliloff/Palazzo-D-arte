@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../services/api';
 import ProductDetailModal from './ProductDetailModal';
+import ConfirmModal from './ConfirmModal';
 
 // Fonction utilitaire pour formater l'affichage du stock
 const formatStockDisplay = (product) => {
@@ -37,6 +38,7 @@ const ProductList = ({ onEdit }) => {
   const [total, setTotal] = useState(0);
   const observerTarget = useRef(null);
   const isInitialMount = useRef(true);
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { product: {...}, isOpen: true }
 
   const fetchMarques = async () => {
     try {
@@ -157,17 +159,27 @@ const ProductList = ({ onEdit }) => {
     setHasMore(true);
   };
 
-  const handleDelete = async (product) => {
-    if (window.confirm(`Delete ${product.nom}?`)) {
-      try {
-        await api.delete(`/products/${product.id}`);
-        // Refresh products
-        const searchTerm = search.trim() || null;
-        fetchProducts(1, false, selectedMarque || null, selectedCategorie || null, searchTerm);
-      } catch (err) {
-        alert('Failed to delete product');
-      }
+  const handleDeleteClick = (product) => {
+    setDeleteConfirm({ product, isOpen: true });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm?.product) return;
+    
+    try {
+      await api.delete(`/products/${deleteConfirm.product.id}`);
+      // Refresh products
+      const searchTerm = search.trim() || null;
+      fetchProducts(1, false, selectedMarque || null, selectedCategorie || null, searchTerm);
+      setDeleteConfirm(null);
+    } catch (err) {
+      alert('Failed to delete product');
+      setDeleteConfirm(null);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm(null);
   };
 
   if (loading && products.length === 0) {
@@ -418,7 +430,7 @@ const ProductList = ({ onEdit }) => {
                   product={product}
                   onViewDetails={() => setSelectedProduct(product)}
                   onEdit={onEdit}
-                  onDelete={handleDelete}
+                  onDelete={handleDeleteClick}
                 />
               ))}
             </div>
@@ -430,7 +442,7 @@ const ProductList = ({ onEdit }) => {
                   product={product}
                   onViewDetails={() => setSelectedProduct(product)}
                   onEdit={onEdit}
-                  onDelete={handleDelete}
+                  onDelete={handleDeleteClick}
                 />
               ))}
             </div>
@@ -455,7 +467,21 @@ const ProductList = ({ onEdit }) => {
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           onEdit={onEdit}
-          onDelete={handleDelete}
+          onDelete={handleDeleteClick}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <ConfirmModal
+          isOpen={deleteConfirm.isOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Supprimer le produit"
+          message={`Êtes-vous sûr de vouloir supprimer "${deleteConfirm.product?.nom}" ? Cette action est irréversible.`}
+          confirmText="Supprimer"
+          cancelText="Annuler"
+          type="danger"
         />
       )}
     </div>
@@ -741,7 +767,7 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
             {product.description}
           </p>
         )}
-        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
           <div>
             <span style={{ color: '#6b7280' }}>Price: </span>
             <span style={{ fontWeight: 700, color: '#1f2937' }}>{product.prixUnitaire} DA</span>

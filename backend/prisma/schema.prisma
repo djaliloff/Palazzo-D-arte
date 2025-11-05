@@ -69,8 +69,8 @@ model Client {
   id        Int        @id @default(autoincrement())
   nom       String
   prenom    String?
-  email     String?    @unique
-  telephone String?    @unique
+  email     String?    
+  telephone String?    
   adresse   String?
   type      TypeClient @default(SIMPLE)
   actif     Boolean    @default(true)
@@ -129,7 +129,7 @@ model Produit {
   prixTotal               Float
   poids                   Float?       
   uniteMesure             UniteMesure  @default(PIECE)
-  quantite_depos          Float        @default(0)
+  // quantite_depos          Float        @default(0)
   quantite_stock          Float        @default(0)
   seuilAlerte             Float        @default(5)
   venduParUnite           Boolean      @default(true) // true = can sell partial (5.5kg), false = whole units only

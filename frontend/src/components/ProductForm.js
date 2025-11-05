@@ -16,7 +16,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
     categorieId: '',
     seuilAlerte: '5',
     quantite_stock: '0',
-    quantite_depos: '0',
     venduParUnite: true,
     perissable: false,
     date_expiration: ''
@@ -45,7 +44,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         categorieId: product.categorieId || '',
         seuilAlerte: product.seuilAlerte || '5',
         quantite_stock: product.quantite_stock || '0',
-        quantite_depos: product.quantite_depos || '0',
         venduParUnite: product.venduParUnite !== undefined ? product.venduParUnite : true,
         perissable: product.perissable !== undefined ? product.perissable : false,
         date_expiration: ''
@@ -149,7 +147,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         categorieId: parseInt(formData.categorieId),
         seuilAlerte: parseFloat(formData.seuilAlerte),
         quantite_stock: parseFloat(formData.quantite_stock) || 0,
-        quantite_depos: parseFloat(formData.quantite_depos) || 0,
         perissable: Boolean(formData.perissable),
         venduParUnite: Boolean(formData.venduParUnite)
       };
@@ -519,19 +516,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
               type="number"
               name="quantite_stock"
               value={formData.quantite_stock}
-              onChange={handleChange}
-              step="0.01"
-              min="0"
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Quantité Dépôt</label>
-            <input
-              type="number"
-              name="quantite_depos"
-              value={formData.quantite_depos}
               onChange={handleChange}
               step="0.01"
               min="0"

@@ -7,7 +7,8 @@ import {
   deleteProduct,
   getLowStockProducts,
   getExpiringLots,
-  addStockToProduct
+  addStockToProduct,
+  retirerStockProduit
 } from '../controllers/product.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireStaff } from '../middlewares/role.middleware.js';
@@ -39,6 +40,11 @@ router.post('/', createProduct);
 
 // Add stock to product
 router.post('/add-stock', addStockToProduct);
+
+// Withdraw stock from product
+// POST /api/products/:id/retirer-stock
+// Body: { "quantite": number }
+router.post('/:id/retirer-stock', retirerStockProduit);
 
 // Update product
 router.put('/:id', updateProduct);

@@ -6,16 +6,6 @@ const ClientPickerModal = ({ onClose, onSelect }) => {
   const [clients, setClients] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [showNewClientForm, setShowNewClientForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [newClientData, setNewClientData] = useState({
-    nom: '',
-    prenom: '',
-    email: '',
-    telephone: '',
-    adresse: '',
-    type: 'SIMPLE'
-  });
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -37,10 +27,6 @@ const ClientPickerModal = ({ onClose, onSelect }) => {
     (client.telephone?.includes(clientSearch))
   );
   const limitedClients = filteredClients.slice(0, 20);
-
-  const handleCreateClient = async (e) => {
-    e.preventDefault();
-  };
 
   return (
     <div style={{
@@ -176,10 +162,6 @@ const ClientPickerModal = ({ onClose, onSelect }) => {
         >
           {showNewClientForm ? 'Cancel' : '+ Create New Client'}
         </button>
-
-        {error && (
-          <div style={{ color: '#dc2626', marginBottom: '0.75rem' }}>{error}</div>
-        )}
 
         {showNewClientForm && (
           <ClientForm
