@@ -275,3 +275,179 @@ export const getSalesStats = asyncHandler(async (req, res) => {
   res.json(stats);
 });
 
+/**
+ * Get total amount per brand (sum of sousTotal of lines)
+ * GET /api/stats/brands/amounts
+ */
+export const getAmountsByBrand = asyncHandler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const whereAchat = {};
+  if (startDate || endDate) {
+    whereAchat.dateAchat = {};
+    if (startDate) whereAchat.dateAchat.gte = new Date(startDate);
+    if (endDate) whereAchat.dateAchat.lte = new Date(endDate);
+  }
+
+  // Fetch lines with product->brand
+  const lignes = await prisma.ligneAchat.findMany({
+    where: {
+      achat: whereAchat
+    },
+    include: {
+      produit: { include: { marque: true } }
+    }
+  });
+
+  const brandMap = new Map();
+  for (const l of lignes) {
+    if (!l.produit?.marque) continue;
+    const key = l.produit.marque.id;
+    const name = l.produit.marque.nom;
+    const current = brandMap.get(key) || { marqueId: key, marque: name, total: 0 };
+    current.total += parseFloat(l.sousTotal || 0);
+    brandMap.set(key, current);
+  }
+
+  res.json(Array.from(brandMap.values()).sort((a,b) => b.total - a.total));
+});
+
+/**
+ * Get top products per brand
+ * GET /api/stats/brands/top-products
+ */
+export const getTopProductsPerBrand = asyncHandler(async (req, res) => {
+  const { startDate, endDate, limit } = req.query;
+  const topN = parseInt(limit) || 5;
+  const whereAchat = {};
+  if (startDate || endDate) {
+    whereAchat.dateAchat = {};
+    if (startDate) whereAchat.dateAchat.gte = new Date(startDate);
+    if (endDate) whereAchat.dateAchat.lte = new Date(endDate);
+  }
+
+  const lignes = await prisma.ligneAchat.findMany({
+    where: { achat: whereAchat },
+    include: {
+      produit: { include: { marque: true } }
+    }
+  });
+
+  const result = {};
+  for (const l of lignes) {
+    const marque = l.produit?.marque;
+    if (!marque) continue;
+    const bKey = marque.id;
+    if (!result[bKey]) {
+      result[bKey] = { marqueId: bKey, marque: marque.nom, products: new Map() };
+    }
+    const pKey = l.produit.id;
+    const prodAgg = result[bKey].products.get(pKey) || {
+      produitId: pKey,
+      produitNom: l.produit.nom,
+      reference: l.produit.reference,
+      quantite: 0,
+      montant: 0
+    };
+    prodAgg.quantite += parseFloat(l.quantite || 0);
+    prodAgg.montant += parseFloat(l.sousTotal || 0);
+    result[bKey].products.set(pKey, prodAgg);
+  }
+
+  const output = Object.values(result).map(group => {
+    const products = Array.from(group.products.values())
+      .sort((a,b) => b.montant - a.montant)
+      .slice(0, topN);
+    return { marqueId: group.marqueId, marque: group.marque, products };
+  });
+
+  res.json(output);
+});
+
+/**
+ * Get top products per category
+ * GET /api/stats/categories/top-products
+ */
+export const getTopProductsPerCategory = asyncHandler(async (req, res) => {
+  const { startDate, endDate, limit } = req.query;
+  const topN = parseInt(limit) || 5;
+  const whereAchat = {};
+  if (startDate || endDate) {
+    whereAchat.dateAchat = {};
+    if (startDate) whereAchat.dateAchat.gte = new Date(startDate);
+    if (endDate) whereAchat.dateAchat.lte = new Date(endDate);
+  }
+
+  const lignes = await prisma.ligneAchat.findMany({
+    where: { achat: whereAchat },
+    include: {
+      produit: { include: { categorie: true } }
+    }
+  });
+
+  const result = {};
+  for (const l of lignes) {
+    const categorie = l.produit?.categorie;
+    if (!categorie) continue;
+    const cKey = categorie.id;
+    if (!result[cKey]) {
+      result[cKey] = { categorieId: cKey, categorie: categorie.nom, products: new Map() };
+    }
+    const pKey = l.produit.id;
+    const prodAgg = result[cKey].products.get(pKey) || {
+      produitId: pKey,
+      produitNom: l.produit.nom,
+      reference: l.produit.reference,
+      quantite: 0,
+      montant: 0
+    };
+    prodAgg.quantite += parseFloat(l.quantite || 0);
+    prodAgg.montant += parseFloat(l.sousTotal || 0);
+    result[cKey].products.set(pKey, prodAgg);
+  }
+
+  const output = Object.values(result).map(group => {
+    const products = Array.from(group.products.values())
+      .sort((a,b) => b.montant - a.montant)
+      .slice(0, topN);
+    return { categorieId: group.categorieId, categorie: group.categorie, products };
+  });
+
+  res.json(output);
+});
+
+/**
+ * Get top clients with optional type filter
+ * GET /api/stats/top-clients?type=SIMPLE|PEINTRE
+ */
+export const getTopClients = asyncHandler(async (req, res) => {
+  const { startDate, endDate, type, limit } = req.query;
+  const topN = parseInt(limit) || 10;
+  const whereAchat = {};
+  if (startDate || endDate) {
+    whereAchat.dateAchat = {};
+    if (startDate) whereAchat.dateAchat.gte = new Date(startDate);
+    if (endDate) whereAchat.dateAchat.lte = new Date(endDate);
+  }
+
+  const whereClient = {};
+  if (type) whereClient.type = type;
+
+  const achats = await prisma.achat.findMany({
+    where: { ...whereAchat, client: whereClient },
+    include: { client: true }
+  });
+
+  const map = new Map();
+  for (const a of achats) {
+    if (!a.client) continue;
+    const key = a.client.id;
+    const current = map.get(key) || { clientId: key, nom: a.client.nom, prenom: a.client.prenom, type: a.client.type, total: 0, count: 0 };
+    current.total += parseFloat(a.prix_total_remise || 0);
+    current.count += 1;
+    map.set(key, current);
+  }
+
+  const list = Array.from(map.values()).sort((a,b) => b.total - a.total).slice(0, topN);
+  res.json(list);
+});
+

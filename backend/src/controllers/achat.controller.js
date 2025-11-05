@@ -410,3 +410,44 @@ export const updateAchatStatut = asyncHandler(async (req, res) => {
   res.json(achat);
 });
 
+/**
+ * Add a versment (payment) to an achat
+ * PUT /api/achats/:id/versment
+ */
+export const addAchatVersment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { versment } = req.body;
+
+  const amountToAdd = parseFloat(versment);
+  if (Number.isNaN(amountToAdd) || amountToAdd <= 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'versment must be a positive number'
+    });
+  }
+
+  // Update versment by incrementing the current value
+  const updatedAchat = await prisma.achat.update({
+    where: { id: parseInt(id) },
+    data: {
+      versment: { increment: amountToAdd }
+    },
+    include: {
+      client: true,
+      utilisateur: {
+        select: { id: true, nom: true, prenom: true, email: true }
+      },
+      ligneAchats: {
+        include: {
+          produit: {
+            select: { id: true, reference: true, nom: true, uniteMesure: true }
+          }
+        }
+      }
+    }
+  });
+
+  logger.success(`Purchase payment added: ${updatedAchat.numeroBon} +${amountToAdd}`);
+  res.json(updatedAchat);
+});
+

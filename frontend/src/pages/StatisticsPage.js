@@ -14,6 +14,11 @@ const StatisticsPage = () => {
   const [salesByDay, setSalesByDay] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [brandAmounts, setBrandAmounts] = useState([]);
+  const [topByBrand, setTopByBrand] = useState([]);
+  const [topByCategory, setTopByCategory] = useState([]);
+  const [topClients, setTopClients] = useState([]);
+  const [clientTypeFilter, setClientTypeFilter] = useState('');
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: ''
@@ -22,7 +27,14 @@ const StatisticsPage = () => {
   useEffect(() => {
     fetchStats();
     fetchSalesStats();
+    fetchBrandAmounts();
+    fetchTopProducts();
+    fetchTopClients();
   }, [filters]);
+
+  useEffect(() => {
+    fetchTopClients();
+  }, [clientTypeFilter]);
 
   const fetchStats = async () => {
     try {
@@ -57,6 +69,50 @@ const StatisticsPage = () => {
     }
   };
 
+  const buildDateParams = () => {
+    const params = {};
+    if (filters.startDate) params.startDate = filters.startDate;
+    if (filters.endDate) params.endDate = filters.endDate;
+    return params;
+  };
+
+  const fetchBrandAmounts = async () => {
+    try {
+      const params = buildDateParams();
+      const res = await api.get('/stats/brands/amounts', { params });
+      setBrandAmounts(res.data || []);
+    } catch (e) {
+      console.error('Failed to load brand amounts', e);
+    }
+  };
+
+  const fetchTopProducts = async () => {
+    try {
+      const params = buildDateParams();
+      params.limit = 5;
+      const [byBrand, byCategory] = await Promise.all([
+        api.get('/stats/brands/top-products', { params }),
+        api.get('/stats/categories/top-products', { params })
+      ]);
+      setTopByBrand(byBrand.data || []);
+      setTopByCategory(byCategory.data || []);
+    } catch (e) {
+      console.error('Failed to load top products', e);
+    }
+  };
+
+  const fetchTopClients = async () => {
+    try {
+      const params = buildDateParams();
+      if (clientTypeFilter) params.type = clientTypeFilter;
+      params.limit = 10;
+      const res = await api.get('/stats/top-clients', { params });
+      setTopClients(res.data || []);
+    } catch (e) {
+      console.error('Failed to load top clients', e);
+    }
+  };
+
   const handleFilterChange = (name, value) => {
     setFilters({
       ...filters,
@@ -71,9 +127,9 @@ const StatisticsPage = () => {
     });
   };
 
-  // Calculate max value for chart scaling
+  // Calculate max value for chart scaling (consider sales, net and returns)
   const maxChartValue = salesByDay.length > 0 
-    ? Math.max(...salesByDay.map(d => Math.max(d.sales || 0, d.net || 0)))
+    ? Math.max(...salesByDay.map(d => Math.max(d.sales || 0, d.net || 0, d.returns || 0)))
     : 0;
 
   if (loading) return (
@@ -414,7 +470,7 @@ const StatisticsPage = () => {
                         height: `${netHeight}%`,
                         background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
                         borderRadius: '4px 4px 0 0',
-                        minHeight: netHeight > 0 ? '2px' : '0',
+                        minHeight: netHeight > 0 ? '6px' : '0',
                         transition: 'all 0.3s ease',
                         cursor: 'pointer',
                         boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
@@ -437,7 +493,7 @@ const StatisticsPage = () => {
                           height: `${(day.returns / maxChartValue) * 100}%`,
                           background: 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)',
                           borderRadius: '0 0 4px 4px',
-                          minHeight: '2px',
+                          minHeight: '6px',
                           transition: 'all 0.3s ease',
                           cursor: 'pointer',
                           boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
@@ -504,6 +560,139 @@ const StatisticsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Amount per Brand */}
+      {brandAmounts && brandAmounts.length > 0 && (
+        <div style={{
+          background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb', marginTop: '2rem'
+        }}>
+          <h2 style={{ margin: 0, marginBottom: '1rem' }}>Montant total par marque</h2>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Marque</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {brandAmounts.map((b) => (
+                  <tr key={b.marqueId} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0.75rem', fontWeight: 600 }}>{b.marque}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: '#667eea' }}>{parseFloat(b.total || 0).toFixed(2)} DA</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Top Products per Brand */}
+      {topByBrand && topByBrand.length > 0 && (
+        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e5e7eb', marginTop: '2rem' }}>
+          <h2 style={{ margin: 0, marginBottom: '1rem' }}>Produits les plus achetés par marque</h2>
+          {topByBrand.map(group => (
+            <div key={group.marqueId} style={{ marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem 0' }}>{group.marque}</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f5f5f5' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Produit</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Quantité</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Montant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.products.map(p => (
+                      <tr key={p.produitId} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '0.75rem', fontWeight: 600 }}>{p.produitNom || p.reference}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>{parseFloat(p.quantite || 0).toFixed(2)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: '#667eea' }}>{parseFloat(p.montant || 0).toFixed(2)} DA</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Top Products per Category */}
+      {topByCategory && topByCategory.length > 0 && (
+        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e5e7eb', marginTop: '2rem' }}>
+          <h2 style={{ margin: 0, marginBottom: '1rem' }}>Produits les plus achetés par catégorie</h2>
+          {topByCategory.map(group => (
+            <div key={group.categorieId} style={{ marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem 0' }}>{group.categorie}</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f5f5f5' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Produit</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Quantité</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Montant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.products.map(p => (
+                      <tr key={p.produitId} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '0.75rem', fontWeight: 600 }}>{p.produitNom || p.reference}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>{parseFloat(p.quantite || 0).toFixed(2)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: '#667eea' }}>{parseFloat(p.montant || 0).toFixed(2)} DA</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Top Clients with Type Filter */}
+      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e5e7eb', marginTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0 }}>Meilleurs clients</h2>
+          <select
+            value={clientTypeFilter}
+            onChange={(e) => setClientTypeFilter(e.target.value)}
+            style={{ padding: '0.5rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+          >
+            <option value="">Tous</option>
+            <option value="SIMPLE">Simple</option>
+            <option value="PEINTRE">Peintre</option>
+          </select>
+        </div>
+        {topClients && topClients.length > 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Client</th>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Type</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Achats</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topClients.map(c => (
+                  <tr key={c.clientId} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0.75rem', fontWeight: 600 }}>{c.prenom || ''} {c.nom || ''}</td>
+                    <td style={{ padding: '0.75rem' }}>{c.type}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>{c.count}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: '#667eea' }}>{parseFloat(c.total || 0).toFixed(2)} DA</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ color: '#6b7280' }}>Aucun résultat</div>
+        )}
+      </div>
 
       {/* Sales Statistics */}
       {salesStats && Array.isArray(salesStats) && salesStats.length > 0 && (

@@ -1,7 +1,11 @@
 import express from 'express';
 import {
   getDashboardStats,
-  getSalesStats
+  getSalesStats,
+  getAmountsByBrand,
+  getTopProductsPerBrand,
+  getTopProductsPerCategory,
+  getTopClients
 } from '../controllers/stats.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireStaff } from '../middlewares/role.middleware.js';
@@ -17,6 +21,18 @@ router.get('/dashboard', getDashboardStats);
 
 // Sales statistics
 router.get('/sales', getSalesStats);
+
+// Amount per brand
+router.get('/brands/amounts', getAmountsByBrand);
+
+// Top products per brand
+router.get('/brands/top-products', getTopProductsPerBrand);
+
+// Top products per category
+router.get('/categories/top-products', getTopProductsPerCategory);
+
+// Top clients (optional type filter)
+router.get('/top-clients', getTopClients);
 
 export default router;
 

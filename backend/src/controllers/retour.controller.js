@@ -317,10 +317,10 @@ export const createRetour = asyncHandler(async (req, res) => {
   }
 
   // Always update status to reflect current state
-  await prisma.achat.update({
-    where: { id: achatId },
-    data: { statut: newStatut }
-  });
+    await prisma.achat.update({
+      where: { id: achatId },
+      data: { statut: newStatut }
+    });
 
   logger.success(`Return created: ${retour.numeroRetour}`);
   res.status(201).json(retour);

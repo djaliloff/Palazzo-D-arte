@@ -13,6 +13,9 @@ const AchatList = () => {
     statut: '',
     clientId: ''
   });
+  const [showVersementModal, setShowVersementModal] = useState(false);
+  const [versementInput, setVersementInput] = useState('');
+  const [notification, setNotification] = useState({ open: false, type: 'info', message: '' });
 
   useEffect(() => {
     fetchAchats();
@@ -158,7 +161,7 @@ const AchatList = () => {
       const response = await api.get(`/achats/${achatId}`);
       setSelectedAchat(response.data);
     } catch (err) {
-      alert('Failed to load purchase details');
+      setNotification({ open: true, type: 'error', message: 'Failed to load purchase details' });
       console.error(err);
     }
   };
@@ -269,11 +272,16 @@ const AchatList = () => {
       doc.text(`TOTAL: ${parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA`, pageWidth - 20, finalY + 22, { align: 'right' });
       doc.setTextColor(0, 0, 0);
 
+      // Versement & Reste
+      doc.setFontSize(11);
+      doc.text(`Versement: ${parseFloat(selectedAchat.versment || 0).toFixed(2)} DA`, pageWidth - 20, finalY + 29, { align: 'right' });
+      doc.text(`Reste: ${(Math.max(0, (parseFloat(selectedAchat.prix_total_remise || 0) - parseFloat(selectedAchat.versment || 0))).toFixed(2))} DA`, pageWidth - 20, finalY + 36, { align: 'right' });
+
       // Notes
       if (selectedAchat.notes) {
         doc.setFontSize(11);
         doc.setFont(undefined, 'normal');
-        doc.text(`Notes: ${selectedAchat.notes}`, 14, finalY + 35);
+        doc.text(`Notes: ${selectedAchat.notes}`, 14, finalY + 45);
       }
 
       // Footer
@@ -285,7 +293,7 @@ const AchatList = () => {
       doc.save(`Bon_Achat_${selectedAchat.numeroBon}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Erreur lors de la génération du PDF. Vérifiez que les bibliothèques sont installées.');
+      setNotification({ open: true, type: 'error', message: "Erreur lors de la génération du PDF. Vérifiez les bibliothèques." });
     }
   };
 
@@ -412,9 +420,9 @@ const AchatList = () => {
         <div class="totals">
           <div><strong>Sous-total:</strong> ${parseFloat(selectedAchat.prix_total || 0).toFixed(2)} DA</div>
           <div><strong>Remise globale:</strong> ${parseFloat(selectedAchat.remiseGlobale || 0).toFixed(2)} DA</div>
-          <div class="total-final">
-            <strong>TOTAL: ${parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA</strong>
-          </div>
+          <div><strong>Versement:</strong> ${parseFloat(selectedAchat.versment || 0).toFixed(2)} DA</div>
+          <div><strong>Reste:</strong> ${(Math.max(0, (parseFloat(selectedAchat.prix_total_remise || 0) - parseFloat(selectedAchat.versment || 0))).toFixed(2))} DA</div>
+          <div class="total-final"><strong>TOTAL: ${parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA</strong></div>
         </div>
         
         ${selectedAchat.notes ? `
@@ -441,6 +449,88 @@ const AchatList = () => {
 
   return (
     <div>
+      {/* Notification Popup */}
+      {notification.open && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: notification.type === 'error' ? '#fee2e2' : notification.type === 'success' ? '#dcfce7' : '#e0e7ff',
+          color: '#111827',
+          border: '1px solid rgba(0,0,0,0.1)',
+          padding: '0.75rem 1rem',
+          borderRadius: '8px',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+          zIndex: 1100
+        }}
+          onClick={() => setNotification({ ...notification, open: false })}
+        >
+          {notification.message}
+        </div>
+      )}
+
+      {/* Versement Modal */}
+      {showVersementModal && selectedAchat && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050
+        }}
+        onClick={() => setShowVersementModal(false)}
+        >
+          <div style={{
+            background: 'white', padding: '1.5rem', borderRadius: '10px', width: '100%', maxWidth: '420px', boxShadow: '0 10px 30px rgba(0,0,0,0.25)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Ajouter un versement</h3>
+            <div style={{ marginBottom: '0.75rem', color: '#6b7280' }}>
+              Total: {parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA • Déjà versé: {parseFloat(selectedAchat.versment || 0).toFixed(2)} DA
+            </div>
+            <input
+              type="number"
+              value={versementInput}
+              onChange={(e) => setVersementInput(e.target.value)}
+              min="0"
+              step="0.01"
+              placeholder="Montant (DA)"
+              style={{ width: '100%', padding: '0.75rem', border: '1px solid #e5e7eb', borderRadius: '8px', marginBottom: '1rem' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                onClick={() => setShowVersementModal(false)}
+                style={{ padding: '0.5rem 1rem', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer' }}
+              >Annuler</button>
+              <button
+                onClick={async () => {
+                  const amount = parseFloat(versementInput);
+                  if (isNaN(amount) || amount <= 0) {
+                    setNotification({ open: true, type: 'error', message: 'Veuillez saisir un montant positif.' });
+                    return;
+                  }
+                  const current = parseFloat(selectedAchat.versment || 0);
+                  const totalAllowed = parseFloat(selectedAchat.prix_total_remise || 0);
+                  if (current + amount > totalAllowed) {
+                    setNotification({ open: true, type: 'error', message: `Le versement dépasse le total autorisé. Maximum: ${(totalAllowed - current).toFixed(2)} DA` });
+                    return;
+                  }
+                  try {
+                    await api.put(`/achats/${selectedAchat.id}/versment`, { amount });
+                    const refreshed = await api.get(`/achats/${selectedAchat.id}`);
+                    setSelectedAchat(refreshed.data);
+                    await fetchAchats();
+                    setNotification({ open: true, type: 'success', message: 'Versement ajouté avec succès.' });
+                    setShowVersementModal(false);
+                  } catch (e) {
+                    setNotification({ open: true, type: 'error', message: e.response?.data?.message || "Erreur lors de l'ajout du versement" });
+                  }
+                }}
+                style={{ padding: '0.5rem 1rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+              >Confirmer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Details Modal */}
       {selectedAchat && (
         <div style={{
@@ -623,6 +713,22 @@ const AchatList = () => {
                   {parseFloat(selectedAchat.remiseGlobale || 0).toFixed(2)} DA
                 </div>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ color: '#666' }}>
+                  <strong>Versement:</strong>
+                </div>
+                <div style={{ color: '#10b981', fontWeight: 600 }}>
+                  {parseFloat(selectedAchat.versment || 0).toFixed(2)} DA
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ color: '#666' }}>
+                  <strong>Reste à payer:</strong>
+                </div>
+                <div style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {(Math.max(0, (parseFloat(selectedAchat.prix_total_remise || 0) - parseFloat(selectedAchat.versment || 0))).toFixed(2))} DA
+                </div>
+              </div>
               {calculateTotalReturns(selectedAchat) > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ddd' }}>
                   <div style={{ color: '#ef4444' }}>
@@ -706,7 +812,23 @@ const AchatList = () => {
               </div>
             )}
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                onClick={() => { setVersementInput(''); setShowVersementModal(true); }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                ➕ Ajouter versement
+              </button>
               <button
                 onClick={generatePDF}
                 style={{
@@ -1051,9 +1173,10 @@ const AchatList = () => {
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.85rem' }}>TELEPHONE</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.85rem' }}>TYPE</th>
                   <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>AMOUNT</th>
+                  <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>VERSEMENT</th>
+                  <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>RESTE</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.85rem' }}>DATE</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.85rem' }}>STATUS</th>
-                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600, fontSize: '0.85rem' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -1064,7 +1187,8 @@ const AchatList = () => {
                     <tr key={achat.id} style={{ 
                       borderBottom: '1px solid #e5e7eb',
                       transition: 'background 0.2s',
-                      background: index % 2 === 0 ? 'white' : '#f9fafb'
+                      background: index % 2 === 0 ? 'white' : '#f9fafb',
+                      cursor: 'pointer'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = '#f3f4f6';
@@ -1074,6 +1198,7 @@ const AchatList = () => {
                       e.currentTarget.style.background = index % 2 === 0 ? 'white' : '#f9fafb';
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
+                    onClick={() => viewDetails(achat.id)}
                     >
                       <td style={{ 
                         padding: '1rem', 
@@ -1143,6 +1268,12 @@ const AchatList = () => {
                           </div>
                         )}
                       </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', color: '#10b981', fontWeight: 700 }}>
+                        {parseFloat(achat.versment || 0).toFixed(2)} DA
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', color: '#ef4444', fontWeight: 700 }}>
+                        {(Math.max(0, (parseFloat(achat.prix_total_remise || 0) - parseFloat(achat.versment || 0))).toFixed(2))} DA
+                      </td>
                       <td style={{ padding: '1rem', color: '#6b7280' }}>
                         {new Date(achat.dateAchat).toLocaleDateString()}
                       </td>
@@ -1164,33 +1295,7 @@ const AchatList = () => {
                           {statusBadge.text}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem' }}>
-                        <button
-                          onClick={() => viewDetails(achat.id)}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'linear-gradient(135deg, #5568d3 0%, #667eea 100%)';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                          style={{
-                            padding: '0.5rem 0.875rem',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)'
-                          }}
-                        >
-                          👁️ View Details
-                        </button>
-                      </td>
+                      
                     </tr>
                   );
                 })}

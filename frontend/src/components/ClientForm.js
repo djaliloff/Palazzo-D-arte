@@ -110,9 +110,9 @@ const ClientForm = ({ client, onSuccess, onCancel }) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
-        <button
-          onClick={onCancel}
-          style={{
+          <button
+            onClick={onCancel}
+            style={{
             position: 'absolute',
             top: '1.5rem',
             right: '1.5rem',
@@ -123,8 +123,8 @@ const ClientForm = ({ client, onSuccess, onCancel }) => {
             width: '44px',
             height: '44px',
             color: '#1f2937',
-            fontSize: '1.5rem',
-            cursor: 'pointer',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -143,10 +143,10 @@ const ClientForm = ({ client, onSuccess, onCancel }) => {
             e.currentTarget.style.color = '#1f2937';
             e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-          }}
-        >
-          ✕
-        </button>
+            }}
+          >
+            ✕
+          </button>
 
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ 

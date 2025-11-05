@@ -122,9 +122,9 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
       onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
-        <button
-          onClick={onCancel}
-          style={{
+          <button
+            onClick={onCancel}
+            style={{
             position: 'absolute',
             top: '1.5rem',
             right: '1.5rem',
@@ -135,8 +135,8 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
             width: '44px',
             height: '44px',
             color: '#1f2937',
-            fontSize: '1.5rem',
-            cursor: 'pointer',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -155,10 +155,10 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
             e.currentTarget.style.color = '#1f2937';
             e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-          }}
-        >
-          ✕
-        </button>
+            }}
+          >
+            ✕
+          </button>
 
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ 
@@ -275,15 +275,15 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
           </div>
 
           {(selectedProduct?.perissable || formData.quantite_stock_ajout) && (
-            <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
                 Date d'expiration {selectedProduct?.perissable ? '*' : '(optionnelle)'}
               </label>
-              <input
-                type="date"
-                name="date_expiration"
-                value={formData.date_expiration}
-                onChange={handleChange}
+            <input
+              type="date"
+              name="date_expiration"
+              value={formData.date_expiration}
+              onChange={handleChange}
                 required={selectedProduct?.perissable && formData.quantite_stock_ajout}
                 min={new Date().toISOString().split('T')[0]}
                 style={{ 
@@ -306,7 +306,7 @@ const AddStockForm = ({ onSuccess, onCancel }) => {
                 </div>
               )}
               {!selectedProduct?.perissable && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
                   Si remplie, cette date d'expiration sera appliquée au lot
                 </div>
               )}

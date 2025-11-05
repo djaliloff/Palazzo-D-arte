@@ -91,8 +91,8 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result;
-        setFormData({
-          ...formData,
+    setFormData({
+      ...formData,
           image: base64String
         });
         setImagePreview(base64String);
@@ -211,9 +211,9 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
       onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
-        <button
-          onClick={onCancel}
-          style={{
+          <button
+            onClick={onCancel}
+            style={{
             position: 'absolute',
             top: '1.5rem',
             right: '1.5rem',
@@ -224,8 +224,8 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
             width: '44px',
             height: '44px',
             color: '#1f2937',
-            fontSize: '1.5rem',
-            cursor: 'pointer',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -244,10 +244,10 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
             e.currentTarget.style.color = '#1f2937';
             e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-          }}
-        >
-          ✕
-        </button>
+            }}
+          >
+            ✕
+          </button>
 
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ 
@@ -362,14 +362,14 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
 
             {/* Image Input based on source */}
             {imageSource === 'url' ? (
-              <input
-                type="text"
-                name="image"
-                value={formData.image}
-                onChange={handleChange}
-                placeholder="https://example.com/image.jpg"
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-              />
+            <input
+              type="text"
+              name="image"
+              value={formData.image}
+              onChange={handleChange}
+              placeholder="https://example.com/image.jpg"
+              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+            />
             ) : (
               <input
                 type="file"
@@ -383,21 +383,21 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
             {/* Image Preview */}
             {imagePreview && (
               <div style={{ marginTop: '0.75rem' }}>
-                <img 
+              <img 
                   src={imagePreview} 
-                  alt="Preview"
-                  style={{
-                    width: '100%',
-                    maxHeight: '200px',
-                    objectFit: 'contain',
-                    borderRadius: '6px',
+                alt="Preview"
+                style={{
+                  width: '100%',
+                  maxHeight: '200px',
+                  objectFit: 'contain',
+                  borderRadius: '6px',
                     border: '1px solid #eee',
                     background: '#f8f9fa'
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
               </div>
             )}
           </div>
@@ -540,17 +540,17 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem', gridColumn: '1 / -1' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <input
-                type="checkbox"
-                name="venduParUnite"
-                checked={formData.venduParUnite}
-                onChange={handleChange}
-                id="venduParUnite"
-              />
-              <label htmlFor="venduParUnite" style={{ cursor: 'pointer' }}>
-                Can sell partial units (e.g., 5.5kg)
-              </label>
-            </div>
+            <input
+              type="checkbox"
+              name="venduParUnite"
+              checked={formData.venduParUnite}
+              onChange={handleChange}
+              id="venduParUnite"
+            />
+            <label htmlFor="venduParUnite" style={{ cursor: 'pointer' }}>
+              Can sell partial units (e.g., 5.5kg)
+            </label>
+          </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <input
                 type="checkbox"

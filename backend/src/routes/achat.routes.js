@@ -3,7 +3,8 @@ import {
   getAllAchats,
   getAchatById,
   createAchat,
-  updateAchatStatut
+  updateAchatStatut,
+  addAchatVersment
 } from '../controllers/achat.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireStaff } from '../middlewares/role.middleware.js';
@@ -25,6 +26,9 @@ router.post('/', createAchat);
 
 // Update purchase status
 router.put('/:id/statut', updateAchatStatut);
+
+// Add versment to purchase
+router.put('/:id/versment', addAchatVersment);
 
 export default router;
 
