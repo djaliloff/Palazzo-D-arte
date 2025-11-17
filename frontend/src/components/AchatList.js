@@ -27,6 +27,18 @@ const AchatList = () => {
     applyFilters();
   }, [achats, filters]);
 
+  // Close notification toast when clicking anywhere on the page
+  useEffect(() => {
+    if (!notification.open) return;
+
+    const handleClickAnywhere = () => {
+      setNotification((prev) => ({ ...prev, open: false }));
+    };
+
+    window.addEventListener('click', handleClickAnywhere);
+    return () => window.removeEventListener('click', handleClickAnywhere);
+  }, [notification.open]);
+
   const fetchClients = async () => {
     try {
       const response = await api.get('/clients');
@@ -1218,7 +1230,8 @@ const AchatList = () => {
                       borderBottom: '1px solid #e5e7eb',
                       transition: 'background 0.2s',
                       background: index % 2 === 0 ? 'white' : '#f9fafb',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      userSelect: 'none'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = '#f3f4f6';

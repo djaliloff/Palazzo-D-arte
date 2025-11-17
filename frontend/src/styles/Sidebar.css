@@ -10,6 +10,11 @@
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
   z-index: 1000;
   transition: transform 0.3s ease;
+  user-select: none;
+}
+
+.sidebar * {
+  user-select: none;
 }
 
 /* Header */

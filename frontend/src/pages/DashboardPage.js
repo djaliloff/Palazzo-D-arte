@@ -126,7 +126,14 @@ const DashboardPage = () => {
       {/* Stats Grid */}
       <section className="metrics-grid">
         {statsCards.map((stat, idx) => (
-          <article key={idx} className="metric-card" style={{ borderLeftColor: stat.color }}>
+          <article
+            key={idx}
+            className="metric-card"
+            style={{
+              borderLeftColor: stat.color,
+              userSelect: 'none'
+            }}
+          >
             <div className="metric-card__icon" aria-hidden="true">
               {stat.icon}
             </div>
@@ -166,7 +173,10 @@ const DashboardPage = () => {
                   const statusBadge = getStatusBadgeColor(achat.statut);
                   const typeBadge = getClientTypeBadgeColor(achat.client?.type);
                   return (
-                    <tr key={achat.id}>
+                    <tr
+                      key={achat.id}
+                      style={{ userSelect: 'none' }}
+                    >
                       <td className="data-table__cell--strong">
                         {achat.numeroBon}
                       </td>

@@ -614,7 +614,8 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%'
+        height: '100%',
+        userSelect: 'none'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-4px)';
@@ -850,7 +851,8 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
         gridTemplateColumns: '120px 1fr',
         gap: '1rem',
         alignItems: 'center',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        userSelect: 'none'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';

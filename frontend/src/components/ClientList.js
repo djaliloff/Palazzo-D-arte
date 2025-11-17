@@ -400,7 +400,8 @@ const ClientList = ({ onEdit, refreshKey }) => {
                   style={{ 
                     borderBottom: '1px solid #e5e7eb',
                     transition: 'background 0.2s',
-                    background: index % 2 === 0 ? 'white' : '#f9fafb'
+                    background: index % 2 === 0 ? 'white' : '#f9fafb',
+                    userSelect: 'none'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#f3f4f6';
