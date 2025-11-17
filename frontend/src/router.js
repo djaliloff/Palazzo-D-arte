@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
 import ProductsPage from './pages/ProductsPage';
+import InventairePage from './pages/InventairePage';
 import AchatsPage from './pages/AchatsPage';
 import LancerAchatPage from './pages/LancerAchatPage';
 import RetoursPage from './pages/RetoursPage';
@@ -58,6 +59,14 @@ const AppRouter = () => {
             <ProtectedRoute>
               <MainLayout>
                 <ProductsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/inventaire" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <InventairePage />
               </MainLayout>
             </ProtectedRoute>
           } />

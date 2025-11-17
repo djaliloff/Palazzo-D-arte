@@ -85,9 +85,37 @@ const PrettyDatePicker = ({ value, onChange, min, placeholder = 'mm/dd/yyyy', re
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderBottom: '1px solid #e5e7eb' }}>
-            <button type="button" onClick={() => setViewMonth((m) => (m === 0 ? (setViewYear((y) => y - 1), 11) : m - 1))} style={{ background: 'transparent', border: 0, fontSize: '1.25rem', cursor: 'pointer' }}>⬆️</button>
-            <div style={{ fontWeight: 700, color: '#111827' }}>{new Date(viewYear, viewMonth, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' })}</div>
-            <button type="button" onClick={() => setViewMonth((m) => (m === 11 ? (setViewYear((y) => y + 1), 0) : m + 1))} style={{ background: 'transparent', border: 0, fontSize: '1.25rem', cursor: 'pointer' }}>⬇️</button>
+            <button
+              type="button"
+              onClick={() => {
+                if (viewMonth === 0) {
+                  setViewYear(viewYear - 1);
+                  setViewMonth(11);
+                } else {
+                  setViewMonth(viewMonth - 1);
+                }
+              }}
+              style={{ background: 'transparent', border: 0, fontSize: '1.25rem', cursor: 'pointer' }}
+            >
+              ⬆️
+            </button>
+            <div style={{ fontWeight: 700, color: '#111827' }}>
+              {new Date(viewYear, viewMonth, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' })}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (viewMonth === 11) {
+                  setViewYear(viewYear + 1);
+                  setViewMonth(0);
+                } else {
+                  setViewMonth(viewMonth + 1);
+                }
+              }}
+              style={{ background: 'transparent', border: 0, fontSize: '1.25rem', cursor: 'pointer' }}
+            >
+              ⬇️
+            </button>
           </div>
 
           <div style={{ padding: '0.75rem 1rem' }}>

@@ -5,6 +5,64 @@ import { logger } from '../utils/logger.js';
 import { asyncHandler } from '../middlewares/error.middleware.js';
 
 /**
+ * Register user
+ * POST /api/auth/register
+ */
+export const register = asyncHandler(async (req, res) => {
+  const { nom, prenom, email, password } = req.body;
+
+  if (!nom || !email || !password) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Nom, email and password are required'
+    });
+  }
+
+  const existingUser = await prisma.utilisateur.findUnique({
+    where: { email }
+  });
+
+  if (existingUser) {
+    return res.status(409).json({
+      error: 'Conflict',
+      message: 'Email already in use'
+    });
+  }
+
+  const hashedPassword = await hashPassword(password);
+
+  const utilisateur = await prisma.utilisateur.create({
+    data: {
+      nom,
+      prenom,
+      email,
+      password: hashedPassword
+    }
+  });
+
+  const token = generateToken({
+    id: utilisateur.id,
+    email: utilisateur.email,
+    role: utilisateur.role,
+    nom: utilisateur.nom,
+    prenom: utilisateur.prenom
+  });
+
+  logger.success(`User ${utilisateur.email} registered`);
+
+  res.status(201).json({
+    token,
+    user: {
+      id: utilisateur.id,
+      nom: utilisateur.nom,
+      prenom: utilisateur.prenom,
+      email: utilisateur.email,
+      role: utilisateur.role
+    }
+  });
+});
+
+/**
  * Login user
  * POST /api/auth/login
  */

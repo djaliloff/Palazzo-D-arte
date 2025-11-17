@@ -1,39 +1,105 @@
-import React, { useState } from 'react';
-import ConfirmModal from './ConfirmModal';
+import React from 'react';
+
+const SALE_MODE_BADGES = {
+  TOTAL: { label: 'Vente totale', emoji: '🛒' },
+  PARTIAL: { label: 'Vente partielle', emoji: '⚖️' },
+  BOTH: { label: 'Total + partiel', emoji: '🔀' }
+};
+
+const UNIT_LABELS = {
+  PIECE: ['pièce', 'pièces'],
+  KG: 'kg',
+  LITRE: 'L',
+  METRE: 'm'
+};
+
+const formatNumber = (value, options = {}) => {
+  const number = Number(value);
+  const safeNumber = Number.isFinite(number) ? number : 0;
+  return new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    ...options
+  }).format(safeNumber);
+};
+
+const getUnitLabel = (unit, quantity = 0) => {
+  const isPlural = quantity > 1 || quantity === 0;
+
+  if (!unit) {
+    return isPlural ? 'unités' : 'unité';
+  }
+
+  const label = UNIT_LABELS[unit];
+
+  if (Array.isArray(label)) {
+    return isPlural ? label[1] : label[0];
+  }
+
+  return label || unit?.toLowerCase();
+};
+
+const formatStockDisplay = (product) => {
+  const quantity = Number(product?.quantite_stock ?? 0);
+
+  // Si le produit a un poids défini, est vendu par unité et l'unité de mesure est KG,
+  // on affiche "X pièces et Y kg" à partir d'un stock potentiellement fractionnaire.
+  if (product?.poids && product?.uniteMesure === 'KG' && product?.venduParUnite) {
+    const poidsValue = Number(product.poids) || 0;
+    const piecesCompletes = Math.floor(quantity);
+    const resteEnUnite = (quantity - piecesCompletes) * poidsValue;
+
+    if (resteEnUnite > 0 && piecesCompletes > 0) {
+      const piecesLabel = getUnitLabel('PIECE', piecesCompletes);
+      const resteLabel = getUnitLabel(product.uniteMesure, resteEnUnite);
+      return `${piecesCompletes} ${piecesLabel} et ${formatNumber(resteEnUnite, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${resteLabel}`;
+    } else if (piecesCompletes > 0) {
+      const piecesLabel = getUnitLabel('PIECE', piecesCompletes);
+      return `${piecesCompletes} ${piecesLabel}`;
+    } else if (resteEnUnite > 0) {
+      const resteLabel = getUnitLabel(product.uniteMesure, resteEnUnite);
+      return `${formatNumber(resteEnUnite, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${resteLabel}`;
+    }
+  }
+
+  const isCountable = !product?.uniteMesure || product.uniteMesure === 'PIECE';
+  const formattedQuantity = formatNumber(quantity, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: isCountable ? 0 : 2
+  });
+  const unitLabel = getUnitLabel(product?.uniteMesure, quantity);
+
+  return `${formattedQuantity} ${unitLabel}`.trim();
+};
+
+const getPriceLines = (product) => {
+  const lines = [];
+
+  if (product?.modeVente !== 'PARTIAL' && product?.prixTotal != null) {
+    lines.push({
+      label: 'Prix total',
+      value: `${formatNumber(product.prixTotal, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} DA`
+    });
+  }
+
+  if (product?.modeVente !== 'TOTAL' && product?.prixPartiel != null) {
+    const unitLabel = getUnitLabel(product?.uniteMesure);
+    lines.push({
+      label: 'Prix partiel',
+      value: `${formatNumber(product.prixPartiel, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} DA / ${unitLabel}`
+    });
+  }
+
+  return lines;
+};
+
+const getSaleModeBadge = (mode) => SALE_MODE_BADGES[mode] ?? { label: mode || 'Mode inconnu', emoji: 'ℹ️' };
 
 const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
   if (!product) return null;
 
-  const handleDeleteClick = () => {
-    setShowDeleteConfirm(true);
-  };
-
-  const handleDeleteConfirm = () => {
-    if (onDelete) {
-      onDelete(product);
-      onClose();
-    }
-    setShowDeleteConfirm(false);
-  };
-
-  const formatStockDisplay = (product) => {
-    if (product.poids && product.uniteMesure === 'KG' && product.venduParUnite) {
-      const quantiteStock = parseFloat(product.quantite_stock) || 0;
-      const piecesCompletes = Math.floor(quantiteStock);
-      const resteEnKg = (quantiteStock - piecesCompletes) * product.poids;
-      
-      if (resteEnKg > 0 && piecesCompletes > 0) {
-        return `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''} et ${resteEnKg.toFixed(2)} kg`;
-      } else if (piecesCompletes > 0) {
-        return `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''}`;
-      } else if (resteEnKg > 0) {
-        return `${resteEnKg.toFixed(2)} kg`;
-      }
-    }
-    return `${product.quantite_stock} ${product.uniteMesure}`;
-  };
+  const priceLines = getPriceLines(product);
+  const saleMode = getSaleModeBadge(product?.modeVente);
 
   return (
     <div
@@ -232,7 +298,10 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
               )}
               {onDelete && (
                 <button
-                  onClick={handleDeleteClick}
+                  onClick={() => {
+                    onDelete(product);
+                    onClose();
+                  }}
                   style={{
                     width: '100%',
                     padding: '1rem',
@@ -330,7 +399,7 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                   gap: '0.75rem',
                   marginBottom: '0.75rem'
                 }}>
-                  <span style={{ fontSize: '2rem' }}>💰</span>
+                  <span style={{ fontSize: '2rem' }}>{saleMode.emoji}</span>
                   <span style={{
                     color: '#78350f',
                     fontWeight: 700,
@@ -338,25 +407,35 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase'
                   }}>
-                    Unit Price
+                    {saleMode.label}
                   </span>
                 </div>
-                <div style={{
-                  fontSize: '3rem',
-                  fontWeight: 800,
-                  color: '#78350f',
-                  lineHeight: '1'
-                }}>
-                  {product.prixUnitaire} <span style={{ fontSize: '1.5rem' }}>DA</span>
-                </div>
-                {product.prixTotal && product.prixTotal !== product.prixUnitaire && (
+                {priceLines.length > 0 ? (
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {priceLines.map((line) => (
+                      <div
+                        key={`${product.id}-${line.label}`}
+                        style={{
+                          fontSize: '2.5rem',
+                          fontWeight: 800,
+                          color: '#78350f',
+                          lineHeight: '1.1'
+                        }}
+                      >
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{line.label}</div>
+                        <div>
+                          {line.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                   <div style={{
-                    fontSize: '1rem',
-                    color: '#92400e',
-                    marginTop: '0.75rem',
-                    fontWeight: 600
+                    fontSize: '1.2rem',
+                    fontWeight: 600,
+                    color: '#92400e'
                   }}>
-                    Total: {product.prixTotal} DA
+                    Prix non défini pour ce mode de vente.
                   </div>
                 )}
               </div>
@@ -526,10 +605,10 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                   }}
                   >
                     <span style={{ color: '#6b7280', fontWeight: 600, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      📏 Unit
+                      📏 Unité de mesure
                     </span>
                     <span style={{ color: '#1f2937', fontWeight: 700, fontSize: '1rem' }}>
-                      {product.uniteMesure}
+                      {product.uniteMesure ? getUnitLabel(product.uniteMesure, 1) : 'N/A'}
                     </span>
                   </div>
                   {product.poids && (
@@ -560,32 +639,6 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                       </span>
                     </div>
                   )}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '1rem',
-                    background: 'white',
-                    borderRadius: '12px',
-                    border: '1px solid #e5e7eb',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#667eea';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                  >
-                    <span style={{ color: '#6b7280', fontWeight: 600, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      🛒 Partial Units
-                    </span>
-                    <span style={{ color: '#1f2937', fontWeight: 700, fontSize: '1rem' }}>
-                      {product.venduParUnite ? '✅ Allowed' : '❌ Not Allowed'}
-                    </span>
-                  </div>
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -648,9 +701,9 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
                   {product.lot_de_stock.map((lot, index) => {
                     const isExpired = product.perissable && lot.date_expiration && new Date(lot.date_expiration) <= new Date();
                     const expirationDate = lot.date_expiration ? new Date(lot.date_expiration) : null;
-                    const sixMonthsFromNow = new Date();
-                    sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
-                    const isExpiringSoon = expirationDate && expirationDate > new Date() && expirationDate <= sixMonthsFromNow;
+                    const threeMonthsFromNow = new Date();
+                    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+                    const isExpiringSoon = expirationDate && expirationDate > new Date() && expirationDate <= threeMonthsFromNow;
                     const daysUntilExpiration = isExpiringSoon ? Math.ceil((expirationDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
                     return (
                       <div 
@@ -817,23 +870,8 @@ const ProductDetailModal = ({ product, onClose, onEdit, onDelete }) => {
           </div>
         </div>
       </div>
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <ConfirmModal
-          isOpen={showDeleteConfirm}
-          onClose={() => setShowDeleteConfirm(false)}
-          onConfirm={handleDeleteConfirm}
-          title="Supprimer le produit"
-          message={`Êtes-vous sûr de vouloir supprimer "${product.nom}" ? Cette action est irréversible.`}
-          confirmText="Supprimer"
-          cancelText="Annuler"
-          type="danger"
-        />
-      )}
     </div>
   );
 };
 
 export default ProductDetailModal;
-

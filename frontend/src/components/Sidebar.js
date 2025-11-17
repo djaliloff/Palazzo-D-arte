@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Sidebar.css';
 
-const Sidebar = ({ logout }) => {
+const Sidebar = ({ logout, isOpen = true, onNavigate, onClose }) => {
   const { user } = useAuth();
   const location = useLocation();
 
@@ -17,6 +17,7 @@ const Sidebar = ({ logout }) => {
   ];
 
   const adminMenuItems = [
+    { path: '/inventaire', name: 'Inventaire', icon: ' 🗂️ ' },
     { path: '/categories', name: 'Categories', icon: '📝' },
     { path: '/marques', name: 'Brands', icon: '🏷️' },
     { path: '/statistics', name: 'Statistics', icon: '📈' },
@@ -28,22 +29,37 @@ const Sidebar = ({ logout }) => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Get user initials for avatar
-  const getInitials = () => {
-    if (user?.nom && user?.prenom) {
-      return `${user.nom.charAt(0)}${user.prenom.charAt(0)}`.toUpperCase();
+  const handleMenuItemClick = () => {
+    if (onNavigate) {
+      onNavigate();
     }
-    return 'U';
+  };
+
+  const handleLogoutClick = () => {
+    if (onClose) {
+      onClose();
+    }
+    logout();
   };
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
       {/* Logo */}
       <div className="sidebar-header">
         <div className="logo">
           <span className="logo-icon">🖌️</span>
           <span className="logo-text">Palazzo d'Arte</span>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            className="sidebar-close"
+            onClick={onClose}
+            aria-label="Close navigation"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        )}
       </div>
 
       {/* User Profile */}
@@ -63,6 +79,7 @@ const Sidebar = ({ logout }) => {
             key={item.path}
             to={item.path}
             className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
+            onClick={handleMenuItemClick}
           >
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-text">{item.name}</span>
@@ -72,7 +89,7 @@ const Sidebar = ({ logout }) => {
 
       {/* Logout Button */}
       <div className="sidebar-footer">
-        <button onClick={logout} className="logout-btn">
+        <button onClick={handleLogoutClick} className="logout-btn">
           <span className="logout-icon">🚪</span>
           <span>Logout</span>
         </button>

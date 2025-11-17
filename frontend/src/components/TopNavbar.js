@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import '../styles/TopNavbar.css';
 
-const TopNavbar = () => {
+const TopNavbar = ({ onToggleSidebar, isMobile = false, isSidebarOpen = false }) => {
   const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [expiringLots, setExpiringLots] = useState([]);
@@ -75,9 +75,20 @@ const TopNavbar = () => {
   const totalNotificationCount = expiringCount + lowStockCount;
 
   return (
-    <nav className="top-navbar">
+    <nav className={`top-navbar ${isMobile ? 'is-mobile' : ''}`}>
       <div className="top-navbar-left">
-      
+        {onToggleSidebar && (
+          <button
+            type="button"
+            className={`menu-toggle ${isSidebarOpen ? 'open' : ''}`}
+            onClick={onToggleSidebar}
+            aria-label={isSidebarOpen ? 'Masquer la navigation' : 'Afficher la navigation'}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        )}
       </div>
 
       <div className="top-navbar-right">

@@ -2,21 +2,34 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import PrettyDatePicker from './PrettyDatePicker';
 
+const MODE_VENTE_OPTIONS = [
+  { value: 'TOTAL', label: 'Vente totale uniquement' },
+  { value: 'PARTIAL', label: 'Vente partielle uniquement' },
+  { value: 'BOTH', label: 'Vente totale et partielle' }
+];
+
+const UNITE_OPTIONS = [
+  { value: 'PIECE', label: 'Pièce' },
+  { value: 'KG', label: 'Kilogramme (kg)' },
+  { value: 'LITRE', label: 'Litre (L)' },
+  { value: 'METRE', label: 'Mètre (m)' }
+];
+
 const ProductForm = ({ product, onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
     reference: '',
     nom: '',
     description: '',
     image: '',
-    prixUnitaire: '',
     prixTotal: '',
+    prixPartiel: '',
+    modeVente: 'TOTAL',
     poids: '',
-    uniteMesure: 'PIECE',
+    uniteMesure: '',
     marqueId: '',
     categorieId: '',
     seuilAlerte: '5',
     quantite_stock: '0',
-    venduParUnite: true,
     perissable: false,
     date_expiration: ''
   });
@@ -24,7 +37,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [imageSource, setImageSource] = useState('url'); // 'url' or 'local'
   const [imagePreview, setImagePreview] = useState('');
 
   useEffect(() => {
@@ -36,20 +48,19 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         nom: product.nom || '',
         description: product.description || '',
         image: product.image || '',
-        prixUnitaire: product.prixUnitaire || '',
-        prixTotal: product.prixTotal || '',
-        poids: product.poids || '',
-        uniteMesure: product.uniteMesure || 'PIECE',
+        prixTotal: product.prixTotal != null ? product.prixTotal.toString() : '',
+        prixPartiel: product.prixPartiel != null ? product.prixPartiel.toString() : '',
+        modeVente: product.modeVente || 'TOTAL',
+        poids: product.poids != null ? product.poids.toString() : '',
+        uniteMesure: product.uniteMesure || '',
         marqueId: product.marqueId || '',
         categorieId: product.categorieId || '',
-        seuilAlerte: product.seuilAlerte || '5',
-        quantite_stock: product.quantite_stock || '0',
-        venduParUnite: product.venduParUnite !== undefined ? product.venduParUnite : true,
+        seuilAlerte: product.seuilAlerte != null ? product.seuilAlerte.toString() : '5',
+        quantite_stock: product.quantite_stock != null ? product.quantite_stock.toString() : '0',
         perissable: product.perissable !== undefined ? product.perissable : false,
         date_expiration: ''
       });
       setImagePreview(product.image || '');
-      setImageSource(product.image?.startsWith('data:') ? 'local' : 'url');
     }
   }, [product]);
 
@@ -90,8 +101,8 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result;
-    setFormData({
-      ...formData,
+        setFormData({
+          ...formData,
           image: base64String
         });
         setImagePreview(base64String);
@@ -99,7 +110,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
       reader.readAsDataURL(file);
     } else {
       // Ensure date_expiration is always a string to avoid controlled/uncontrolled issues
-      const newValue = type === 'checkbox' ? checked : (value || '');
+      const newValue = type === 'checkbox' ? checked : (value ?? '');
       
       // Clear date_expiration if perissable is unchecked or stock is 0
       let updatedFormData = {
@@ -112,23 +123,17 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
       } else if (name === 'quantite_stock' && parseFloat(value || 0) === 0) {
         updatedFormData.date_expiration = '';
       }
+
+      if (name === 'modeVente') {
+        if (newValue === 'TOTAL') {
+          updatedFormData.prixPartiel = '';
+          updatedFormData.uniteMesure = '';
+        } else if (newValue === 'PARTIAL') {
+          updatedFormData.prixTotal = '';
+        }
+      }
       
       setFormData(updatedFormData);
-      
-      // Update preview for URL changes
-      if (name === 'image' && imageSource === 'url') {
-        setImagePreview(value);
-      }
-    }
-  };
-
-  const handleImageSourceChange = (source) => {
-    setImageSource(source);
-    if (source === 'url') {
-      setImagePreview(formData.image);
-    } else {
-      setFormData({ ...formData, image: '' });
-      setImagePreview('');
     }
   };
 
@@ -138,21 +143,49 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
     setError('');
 
     try {
+      if (!formData.nom || !formData.marqueId || !formData.categorieId) {
+        setError('Nom, marque et catégorie sont obligatoires');
+        setLoading(false);
+        return;
+      }
+
+      if (formData.modeVente !== 'PARTIAL' && !formData.prixTotal) {
+        setError('Un prix total est requis pour ce mode de vente');
+        setLoading(false);
+        return;
+      }
+
+      if (formData.modeVente !== 'TOTAL' && (!formData.prixPartiel || !formData.uniteMesure)) {
+        setError('Prix partiel et unité de mesure sont requis pour la vente partielle');
+        setLoading(false);
+        return;
+      }
+
       const data = {
-        ...formData,
-        prixUnitaire: parseFloat(formData.prixUnitaire),
-        prixTotal: parseFloat(formData.prixTotal) || parseFloat(formData.prixUnitaire),
+        reference: formData.reference || undefined,
+        nom: formData.nom,
+        description: formData.description || '',
+        image: formData.image,
+        modeVente: formData.modeVente,
+        prixTotal: formData.prixTotal ? parseFloat(formData.prixTotal) : null,
+        prixPartiel: formData.prixPartiel ? parseFloat(formData.prixPartiel) : null,
+        uniteMesure: formData.uniteMesure || null,
         poids: formData.poids ? parseFloat(formData.poids) : null,
         marqueId: parseInt(formData.marqueId),
         categorieId: parseInt(formData.categorieId),
         seuilAlerte: parseFloat(formData.seuilAlerte),
         quantite_stock: parseFloat(formData.quantite_stock) || 0,
-        perissable: Boolean(formData.perissable),
-        venduParUnite: Boolean(formData.venduParUnite)
+        perissable: Boolean(formData.perissable)
       };
 
-      // Remove reference for new products (it will be auto-generated by backend)
-      if (!product && data.reference) {
+      if (formData.modeVente === 'TOTAL') {
+        data.prixPartiel = null;
+        data.uniteMesure = null;
+      } else if (formData.modeVente === 'PARTIAL') {
+        data.prixTotal = null;
+      }
+
+      if (!product && data.reference === '') {
         delete data.reference;
       }
 
@@ -275,7 +308,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
           gap: '0.75rem',
           fontWeight: 600
         }}>
-          <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+          <span style={{ fontSize: '1.25rem' }}>✕</span>
           <span>{error}</span>
         </div>
       )}
@@ -308,81 +341,39 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
             />
           </div>
 
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Mode de vente *</label>
+            <select
+              name="modeVente"
+              value={formData.modeVente}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+            >
+              {MODE_VENTE_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Product Image</label>
             
-            {/* Image Source Toggle */}
-            <div style={{ 
-              display: 'flex', 
-              gap: '0.5rem', 
-              marginBottom: '1rem',
-              background: '#f8f9fa',
-              padding: '0.5rem',
-              borderRadius: '8px'
-            }}>
-              <button
-                type="button"
-                onClick={() => handleImageSourceChange('url')}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  borderRadius: '6px',
-                  background: imageSource === 'url' ? '#667eea' : 'white',
-                  color: imageSource === 'url' ? 'white' : '#666',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  transition: 'all 0.2s ease',
-                  boxShadow: imageSource === 'url' ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'
-                }}
-              >
-                🌐 From URL
-              </button>
-              <button
-                type="button"
-                onClick={() => handleImageSourceChange('local')}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  borderRadius: '6px',
-                  background: imageSource === 'local' ? '#667eea' : 'white',
-                  color: imageSource === 'local' ? 'white' : '#666',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  transition: 'all 0.2s ease',
-                  boxShadow: imageSource === 'local' ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'
-                }}
-              >
-                📁 From Computer
-              </button>
-            </div>
-
-            {/* Image Input based on source */}
-            {imageSource === 'url' ? (
             <input
-              type="text"
+              type="file"
               name="image"
-              value={formData.image}
+              accept="image/*"
               onChange={handleChange}
-              placeholder="https://example.com/image.jpg"
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
             />
-            ) : (
-              <input
-                type="file"
-                name="image"
-                accept="image/*"
-                onChange={handleChange}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-              />
-            )}
 
             {/* Image Preview */}
             {imagePreview && (
               <div style={{ marginTop: '0.75rem' }}>
               <img 
-                  src={imagePreview} 
+                src={imagePreview}
                 alt="Preview"
                 style={{
                   width: '100%',
@@ -411,35 +402,66 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
             />
           </div>
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Unit Price (DA) *</label>
-            <input
-              type="number"
-              name="prixUnitaire"
-              value={formData.prixUnitaire}
-              onChange={handleChange}
-              required
-              step="0.01"
-              min="0"
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-            />
-          </div>
+          {formData.modeVente !== 'PARTIAL' && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                Prix total (DA) {formData.modeVente !== 'PARTIAL' ? '*' : ''}
+              </label>
+              <input
+                type="number"
+                name="prixTotal"
+                value={formData.prixTotal}
+                onChange={handleChange}
+                required={formData.modeVente !== 'PARTIAL'}
+                step="0.01"
+                min="0"
+                style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+              />
+            </div>
+          )}
+
+          {formData.modeVente !== 'TOTAL' && (
+            <>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  Prix partiel (DA / unité) *
+                </label>
+                <input
+                  type="number"
+                  name="prixPartiel"
+                  value={formData.prixPartiel}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  required
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Unité de mesure *</label>
+                <select
+                  name="uniteMesure"
+                  value={formData.uniteMesure}
+                  onChange={handleChange}
+                  required
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                >
+                  <option value="">Sélectionner une unité</option>
+                  {UNITE_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Total Price (DA)</label>
-            <input
-              type="number"
-              name="prixTotal"
-              value={formData.prixTotal}
-              onChange={handleChange}
-              step="0.01"
-              min="0"
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Weight (KG)</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+              Contenance/Poids total (optionnel)
+            </label>
             <input
               type="number"
               name="poids"
@@ -449,20 +471,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
               min="0"
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
             />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Unit *</label>
-            <select
-              name="uniteMesure"
-              value={formData.uniteMesure}
-              onChange={handleChange}
-              required
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px' }}
-            >
-              <option value="KG">KG</option>
-              <option value="PIECE">PIECE</option>
-            </select>
           </div>
 
           <div>
@@ -525,18 +533,6 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem', gridColumn: '1 / -1' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input
-              type="checkbox"
-              name="venduParUnite"
-              checked={formData.venduParUnite}
-              onChange={handleChange}
-              id="venduParUnite"
-            />
-            <label htmlFor="venduParUnite" style={{ cursor: 'pointer' }}>
-              Can sell partial units (e.g., 5.5kg)
-            </label>
-          </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <input
                 type="checkbox"
                 name="perissable"
@@ -563,7 +559,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
                 min={new Date().toISOString().split('T')[0]}
               />
               <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#f59e0b' }}>
-                ⏰ Une date d'expiration est requise pour créer le lot de stock initial
+                â° Une date d'expiration est requise pour crÃ©er le lot de stock initial
               </div>
             </div>
           )}
@@ -643,12 +639,11 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
           >
             {loading ? (
               <>
-                <span>⏳</span>
+                <span>â³</span>
                 <span>Saving...</span>
               </>
             ) : (
               <>
-                <span>{product ? '✏️' : '➕'}</span>
                 <span>{product ? 'Update Product' : 'Create Product'}</span>
               </>
             )}

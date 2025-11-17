@@ -39,6 +39,12 @@ const recalculerStockFromLots = async (produitId) => {
     throw new Error('Product not found');
   }
 
+  // For non-perishable products, stock is managed directly on quantite_stock
+  // and not recomputed from lots. Simply return current stock.
+  if (!produit.perissable) {
+    return produit.quantite_stock;
+  }
+
   const now = new Date();
   let totalStock = 0;
 
@@ -47,7 +53,7 @@ const recalculerStockFromLots = async (produitId) => {
     // Expired products should not be counted as available stock
     for (const lot of produit.lot_de_stock) {
       if (lot.date_expiration && new Date(lot.date_expiration) > now) {
-        totalStock += lot.quantite;
+        totalStock += lot.quantite_restante;
       }
     }
   } else {
@@ -55,7 +61,7 @@ const recalculerStockFromLots = async (produitId) => {
     // Non-perishable products don't have expiration dates,
     // so all lots are considered available
     for (const lot of produit.lot_de_stock) {
-      totalStock += lot.quantite;
+      totalStock += lot.quantite_restante;
     }
   }
 
@@ -197,24 +203,59 @@ export const createProduct = asyncHandler(async (req, res) => {
     nom,
     description,
     image,
-    prixUnitaire,
+    modeVente,
     prixTotal,
-    poids,
+    prixPartiel,
     uniteMesure,
+    poids,
     marqueId,
     categorieId,
     seuilAlerte,
-    venduParUnite,
     perissable,
     date_expiration,
     quantite_stock
   } = req.body;
 
-  if (!nom || !prixUnitaire || !marqueId || !categorieId) {
+  if (!nom || !marqueId || !categorieId) {
     return res.status(400).json({
       error: 'Validation Error',
-      message: 'Name, unit price, brand and category are required'
+      message: 'Name, brand and category are required'
     });
+  }
+
+  const saleMode = (modeVente || 'TOTAL').toUpperCase();
+  if (!['TOTAL', 'PARTIAL', 'BOTH'].includes(saleMode)) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Invalid sale mode'
+    });
+  }
+
+  const parsedPrixTotal = prixTotal != null && prixTotal !== '' ? parseFloat(prixTotal) : null;
+  const parsedPrixPartiel = prixPartiel != null && prixPartiel !== '' ? parseFloat(prixPartiel) : null;
+  const parsedUnite = uniteMesure ? uniteMesure.toUpperCase() : null;
+  const parsedPoids = poids != null && poids !== '' ? parseFloat(poids) : null;
+
+  if (saleMode !== 'PARTIAL' && (!parsedPrixTotal || isNaN(parsedPrixTotal))) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Total price is required for total sale modes'
+    });
+  }
+
+  if (saleMode !== 'TOTAL') {
+    if (!parsedPrixPartiel || isNaN(parsedPrixPartiel)) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Partial price is required for partial sale modes'
+      });
+    }
+    if (!parsedUnite) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Unit of measure is required for partial sale modes'
+      });
+    }
   }
 
   // Generate unique reference if not provided
@@ -296,17 +337,18 @@ export const createProduct = asyncHandler(async (req, res) => {
       nom,
       description,
       image,
-      prixUnitaire,
-      prixTotal: prixTotal || prixUnitaire,
-      poids,
-      uniteMesure: uniteMesure || 'PIECE',
+      modeVente: saleMode,
+      prixTotal: saleMode === 'PARTIAL' ? null : parsedPrixTotal,
+      prixPartiel: saleMode === 'TOTAL' ? null : parsedPrixPartiel,
+      uniteMesure: saleMode === 'TOTAL' ? null : parsedUnite,
+      poids: parsedPoids,
       marqueId: parseInt(marqueId),
       categorieId: parseInt(categorieId),
-      seuilAlerte: seuilAlerte || 5,
-      quantite_stock: 0, // Will be calculated from lots
-      venduParUnite: venduParUnite !== undefined ? venduParUnite : true,
-      perissable: perissable !== undefined ? Boolean(perissable) : false,
-      quantite_depos: 0 // Default to 0, not used in application
+      seuilAlerte: seuilAlerte ? parseFloat(seuilAlerte) : 5,
+      // For perishable products, stock is driven by lots.
+      // For non-perishable products, we store the initial stock directly.
+      quantite_stock: perissable ? 0 : initialStock,
+      perissable: perissable !== undefined ? Boolean(perissable) : false
     },
     include: {
       marque: true,
@@ -315,11 +357,12 @@ export const createProduct = asyncHandler(async (req, res) => {
   });
 
   // Create initial lot if stock is provided
-  if (initialStock > 0) {
+  if (perissable && initialStock > 0) {
     await prisma.lotDeStock.create({
       data: {
         produitId: produit.id,
         quantite: initialStock,
+        quantite_restante: initialStock,
         date_expiration: date_expiration ? new Date(date_expiration) : null
       }
     });
@@ -349,6 +392,17 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const data = req.body;
 
+  const produitExistant = await prisma.produit.findUnique({
+    where: { id: parseInt(id) }
+  });
+
+  if (!produitExistant) {
+    return res.status(404).json({
+      error: 'Not Found',
+      message: 'Product not found'
+    });
+  }
+
   // Remove fields that shouldn't be updated directly
   delete data.id;
   delete data.createdAt;
@@ -361,13 +415,65 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
   // Convert boolean fields
   if (data.perissable !== undefined) data.perissable = Boolean(data.perissable);
-  if (data.venduParUnite !== undefined) data.venduParUnite = Boolean(data.venduParUnite);
 
-  // Convert numeric fields
-  if (data.prixUnitaire !== undefined) data.prixUnitaire = parseFloat(data.prixUnitaire);
-  if (data.prixTotal !== undefined) data.prixTotal = parseFloat(data.prixTotal);
-  if (data.poids !== undefined) data.poids = data.poids ? parseFloat(data.poids) : null;
-  if (data.seuilAlerte !== undefined) data.seuilAlerte = parseFloat(data.seuilAlerte);
+  // Determine final mode and pricing
+  const saleMode = (data.modeVente || produitExistant.modeVente).toUpperCase();
+  if (!['TOTAL', 'PARTIAL', 'BOTH'].includes(saleMode)) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Invalid sale mode'
+    });
+  }
+
+  const prixTotalValue =
+    data.prixTotal !== undefined
+      ? (data.prixTotal === null || data.prixTotal === '' ? null : parseFloat(data.prixTotal))
+      : produitExistant.prixTotal;
+
+  const prixPartielValue =
+    data.prixPartiel !== undefined
+      ? (data.prixPartiel === null || data.prixPartiel === '' ? null : parseFloat(data.prixPartiel))
+      : produitExistant.prixPartiel;
+
+  const uniteValue =
+    data.uniteMesure !== undefined
+      ? (data.uniteMesure ? data.uniteMesure.toUpperCase() : null)
+      : produitExistant.uniteMesure;
+
+  if (saleMode !== 'PARTIAL' && (!prixTotalValue || isNaN(prixTotalValue))) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'Total price is required for total sale modes'
+    });
+  }
+
+  if (saleMode !== 'TOTAL') {
+    if (!prixPartielValue || isNaN(prixPartielValue)) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Partial price is required for partial sale modes'
+      });
+    }
+    if (!uniteValue) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Unit of measure is required for partial sale modes'
+      });
+    }
+  }
+
+  data.modeVente = saleMode;
+  data.prixTotal = saleMode === 'PARTIAL' ? null : prixTotalValue;
+  data.prixPartiel = saleMode === 'TOTAL' ? null : prixPartielValue;
+  data.uniteMesure = saleMode === 'TOTAL' ? null : uniteValue;
+
+  if (data.poids !== undefined) {
+    data.poids = data.poids === null || data.poids === '' ? null : parseFloat(data.poids);
+  }
+
+  if (data.seuilAlerte !== undefined) {
+    data.seuilAlerte = data.seuilAlerte === '' ? produitExistant.seuilAlerte : parseFloat(data.seuilAlerte);
+  }
 
   const produit = await prisma.produit.update({
     where: { id: parseInt(id) },
@@ -399,20 +505,23 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 });
 
 /**
- * Get products with lots expiring within 6 months
+ * Get products with lots expiring within 3 months
  * GET /api/products/alerts/expiring
  */
 export const getExpiringLots = asyncHandler(async (req, res) => {
   const now = new Date();
-  const sixMonthsFromNow = new Date();
-  sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+  const threeMonthsFromNow = new Date();
+  threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
 
-  // Find all lots expiring within 6 months
+  // Find all lots expiring within 3 months and that still have remaining quantity
   const lots = await prisma.lotDeStock.findMany({
     where: {
       date_expiration: {
         gte: now,
-        lte: sixMonthsFromNow
+        lte: threeMonthsFromNow
+      },
+      quantite_restante: {
+        gt: 0
       }
     },
     include: {
@@ -578,17 +687,27 @@ export const addStockToProduct = asyncHandler(async (req, res) => {
   // Create a new lot for this stock addition
   // For perishable products: lot has expiration date
   // For non-perishable products: lot has no expiration date (null)
-  await prisma.lotDeStock.create({
-    data: {
-      produitId: parseInt(produitId),
-      quantite: parseFloat(quantite_stock_ajout),
-      date_expiration: date_expiration ? new Date(date_expiration) : null
-    }
-  });
+  if (produit.perissable) {
+    await prisma.lotDeStock.create({
+      data: {
+        produitId: parseInt(produitId),
+        quantite: parseFloat(quantite_stock_ajout),
+        quantite_restante: parseFloat(quantite_stock_ajout),
+        date_expiration: date_expiration ? new Date(date_expiration) : null
+      }
+    });
 
-  // Recalculate quantite_stock from all lots
-  // This ensures quantite_stock reflects the actual available stock
-  await recalculerStockFromLots(produitId);
+    // Recalculate quantite_stock from all lots
+    // This ensures quantite_stock reflects the actual available stock
+    await recalculerStockFromLots(produitId);
+  } else {
+    // For non-perishable products, update stock directly on the product
+    const newStock = (produit.quantite_stock || 0) + parseFloat(quantite_stock_ajout);
+    await prisma.produit.update({
+      where: { id: parseInt(produitId) },
+      data: { quantite_stock: newStock }
+    });
+  }
 
   // Get updated product
   const updatedProduit = await prisma.produit.findUnique({

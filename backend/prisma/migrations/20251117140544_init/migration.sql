@@ -5,7 +5,10 @@ CREATE TYPE "Role" AS ENUM ('GESTIONNAIRE', 'ADMIN');
 CREATE TYPE "TypeClient" AS ENUM ('SIMPLE', 'PEINTRE');
 
 -- CreateEnum
-CREATE TYPE "UniteMesure" AS ENUM ('KG', 'PIECE');
+CREATE TYPE "UniteMesure" AS ENUM ('PIECE', 'KG', 'LITRE', 'METRE');
+
+-- CreateEnum
+CREATE TYPE "ModeVente" AS ENUM ('TOTAL', 'PARTIAL', 'BOTH');
 
 -- CreateEnum
 CREATE TYPE "Statut" AS ENUM ('VALIDE', 'RETOURNE_PARTIEL', 'RETOURNE_TOTAL');
@@ -51,6 +54,8 @@ CREATE TABLE "marques" (
     "nom" TEXT NOT NULL,
     "image" TEXT,
     "description" TEXT,
+    "versment" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "credit" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "actif" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -78,22 +83,34 @@ CREATE TABLE "produits" (
     "nom" TEXT NOT NULL,
     "description" TEXT,
     "image" TEXT,
-    "prixUnitaire" DOUBLE PRECISION NOT NULL,
-    "prixTotal" DOUBLE PRECISION NOT NULL,
+    "modeVente" "ModeVente" NOT NULL DEFAULT 'TOTAL',
+    "prixTotal" DOUBLE PRECISION,
+    "prixPartiel" DOUBLE PRECISION,
+    "uniteMesure" "UniteMesure",
     "poids" DOUBLE PRECISION,
-    "uniteMesure" "UniteMesure" NOT NULL DEFAULT 'PIECE',
-    "quantite_depos" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "quantite_stock" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "seuilAlerte" DOUBLE PRECISION NOT NULL DEFAULT 5,
-    "venduParUnite" BOOLEAN NOT NULL DEFAULT true,
     "actif" BOOLEAN NOT NULL DEFAULT true,
     "deleted" BOOLEAN NOT NULL DEFAULT false,
     "marqueId" INTEGER NOT NULL,
     "categorieId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "perissable" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "produits_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "lots_de_stock" (
+    "id" SERIAL NOT NULL,
+    "produitId" INTEGER NOT NULL,
+    "quantite" DOUBLE PRECISION NOT NULL,
+    "date_expiration" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "lots_de_stock_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -110,6 +127,7 @@ CREATE TABLE "achats" (
     "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "versment" DOUBLE PRECISION NOT NULL DEFAULT 0,
 
     CONSTRAINT "achats_pkey" PRIMARY KEY ("id")
 );
@@ -163,12 +181,6 @@ CREATE TABLE "lignes_retours" (
 CREATE UNIQUE INDEX "utilisateurs_email_key" ON "utilisateurs"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "clients_email_key" ON "clients"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "clients_telephone_key" ON "clients"("telephone");
-
--- CreateIndex
 CREATE UNIQUE INDEX "marques_nom_key" ON "marques"("nom");
 
 -- CreateIndex
@@ -184,10 +196,13 @@ CREATE UNIQUE INDEX "achats_numeroBon_key" ON "achats"("numeroBon");
 CREATE UNIQUE INDEX "retours_numeroRetour_key" ON "retours"("numeroRetour");
 
 -- AddForeignKey
+ALTER TABLE "produits" ADD CONSTRAINT "produits_categorieId_fkey" FOREIGN KEY ("categorieId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "produits" ADD CONSTRAINT "produits_marqueId_fkey" FOREIGN KEY ("marqueId") REFERENCES "marques"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "produits" ADD CONSTRAINT "produits_categorieId_fkey" FOREIGN KEY ("categorieId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "lots_de_stock" ADD CONSTRAINT "lots_de_stock_produitId_fkey" FOREIGN KEY ("produitId") REFERENCES "produits"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "achats" ADD CONSTRAINT "achats_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -211,10 +226,10 @@ ALTER TABLE "retours" ADD CONSTRAINT "retours_clientId_fkey" FOREIGN KEY ("clien
 ALTER TABLE "retours" ADD CONSTRAINT "retours_utilisateurId_fkey" FOREIGN KEY ("utilisateurId") REFERENCES "utilisateurs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "lignes_retours" ADD CONSTRAINT "lignes_retours_retourId_fkey" FOREIGN KEY ("retourId") REFERENCES "retours"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "lignes_retours" ADD CONSTRAINT "lignes_retours_ligneAchatId_fkey" FOREIGN KEY ("ligneAchatId") REFERENCES "lignes_achats"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "lignes_retours" ADD CONSTRAINT "lignes_retours_produitId_fkey" FOREIGN KEY ("produitId") REFERENCES "produits"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "lignes_retours" ADD CONSTRAINT "lignes_retours_retourId_fkey" FOREIGN KEY ("retourId") REFERENCES "retours"("id") ON DELETE CASCADE ON UPDATE CASCADE;

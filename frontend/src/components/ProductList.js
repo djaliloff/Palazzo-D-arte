@@ -3,23 +3,129 @@ import api from '../services/api';
 import ProductDetailModal from './ProductDetailModal';
 import ConfirmModal from './ConfirmModal';
 
-// Fonction utilitaire pour formater l'affichage du stock
-const formatStockDisplay = (product) => {
-  if (product.poids && product.uniteMesure === 'KG' && product.venduParUnite) {
-    const quantiteStock = parseFloat(product.quantite_stock) || 0;
-    const piecesCompletes = Math.floor(quantiteStock);
-    const resteEnKg = (quantiteStock - piecesCompletes) * product.poids;
-    
-    if (resteEnKg > 0 && piecesCompletes > 0) {
-      return `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''} et ${resteEnKg.toFixed(2)} kg`;
+const SALE_MODE_BADGES = {
+  TOTAL: { label: 'Vente totale', emoji: '🛒' },
+  PARTIAL: { label: 'Vente partielle', emoji: '⚖️' },
+  BOTH: { label: 'Total + partiel', emoji: '🔀' }
+};
+
+const UNIT_LABELS = {
+  PIECE: ['pièce', 'pièces'],
+  KG: 'kg',
+  LITRE: 'L',
+  METRE: 'm'
+};
+
+const formatNumber = (value, options = {}) => {
+  const number = Number(value);
+  const safeNumber = Number.isFinite(number) ? number : 0;
+  return new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    ...options
+  }).format(safeNumber);
+};
+
+const getUnitLabel = (unit, quantity = 0) => {
+  const isPlural = quantity > 1 || quantity === 0;
+
+  if (!unit) {
+    return isPlural ? 'unités' : 'unité';
+  }
+
+  const label = UNIT_LABELS[unit];
+
+  if (Array.isArray(label)) {
+    return isPlural ? label[1] : label[0];
+  }
+
+  return label || unit.toLowerCase();
+};
+
+export const formatStockDisplay = (product) => {
+  const quantity = Number(product?.quantite_stock ?? 0);
+
+  // For products that can be sold in BOTH modes, display stock as
+  // "X unités" plus remainder in the unit of measure when poids is defined.
+  if (product?.modeVente === 'BOTH') {
+    const poidsValue = Number(product?.poids);
+
+    if (product?.uniteMesure && Number.isFinite(poidsValue) && poidsValue > 0) {
+      const piecesCompletes = Math.floor(quantity);
+      const resteEnUnite = (quantity - piecesCompletes) * poidsValue;
+      // Partie 1 : unités (pièces complètes)
+      const piecesLabel = piecesCompletes > 1 ? 'unités' : 'unité';
+      // Partie 2 : unité de mesure réelle (kg, m, L, ...)
+      const resteLabel = getUnitLabel(product.uniteMesure, resteEnUnite);
+
+      if (resteEnUnite > 0 && piecesCompletes > 0) {
+        return `${piecesCompletes} ${piecesLabel} et ${formatNumber(resteEnUnite, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${resteLabel}`;
+      } else if (piecesCompletes > 0) {
+        return `${piecesCompletes} ${piecesLabel}`;
+      } else if (resteEnUnite > 0) {
+        return `${formatNumber(resteEnUnite, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${resteLabel}`;
+      }
+    }
+
+    const formattedQuantity = formatNumber(quantity, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
+    return `${formattedQuantity} unités`;
+  }
+
+  // Si le produit a un poids défini, est vendu par unité et l'unité de mesure est KG,
+  // on affiche "X pièces et Y kg" à partir d'un stock potentiellement fractionnaire.
+  if (product?.poids && product?.uniteMesure === 'KG' && product?.venduParUnite) {
+    const poidsValue = Number(product.poids) || 0;
+    const piecesCompletes = Math.floor(quantity);
+    const resteEnUnite = (quantity - piecesCompletes) * poidsValue;
+
+    if (resteEnUnite > 0 && piecesCompletes > 0) {
+      const piecesLabel = getUnitLabel('PIECE', piecesCompletes);
+      const resteLabel = getUnitLabel(product.uniteMesure, resteEnUnite);
+      return `${piecesCompletes} ${piecesLabel} et ${formatNumber(resteEnUnite, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${resteLabel}`;
     } else if (piecesCompletes > 0) {
-      return `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''}`;
-    } else if (resteEnKg > 0) {
-      return `${resteEnKg.toFixed(2)} kg`;
+      const piecesLabel = getUnitLabel('PIECE', piecesCompletes);
+      return `${piecesCompletes} ${piecesLabel}`;
+    } else if (resteEnUnite > 0) {
+      const resteLabel = getUnitLabel(product.uniteMesure, resteEnUnite);
+      return `${formatNumber(resteEnUnite, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${resteLabel}`;
     }
   }
-  return `${product.quantite_stock} ${product.uniteMesure}`;
+
+  const isCountable = !product?.uniteMesure || product.uniteMesure === 'PIECE';
+  const formattedQuantity = formatNumber(quantity, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: isCountable ? 0 : 2
+  });
+  const unitLabel = getUnitLabel(product?.uniteMesure, quantity);
+
+  return `${formattedQuantity} ${unitLabel}`.trim();
 };
+
+const getPriceLines = (product) => {
+  const lines = [];
+
+  if (product?.modeVente !== 'PARTIAL' && product?.prixTotal != null) {
+    lines.push({
+      label: 'Prix total',
+      value: `${formatNumber(product.prixTotal, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} DA`
+    });
+  }
+
+  if (product?.modeVente !== 'TOTAL' && product?.prixPartiel != null) {
+    const unitLabel = getUnitLabel(product?.uniteMesure);
+    lines.push({
+      label: 'Prix partiel',
+      value: `${formatNumber(product.prixPartiel, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} DA / ${unitLabel}`
+    });
+  }
+
+  return lines;
+};
+
+const getSaleModeBadge = (mode) => SALE_MODE_BADGES[mode] ?? { label: mode || 'Mode inconnu', emoji: 'ℹ️' };
 
 const ProductList = ({ onEdit }) => {
   const [products, setProducts] = useState([]);
@@ -490,6 +596,9 @@ const ProductList = ({ onEdit }) => {
 
 // Compact Product Card Component
 const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
+  const priceLines = getPriceLines(product);
+  const saleMode = getSaleModeBadge(product?.modeVente);
+
   return (
     <div 
       onClick={() => onViewDetails()}
@@ -587,6 +696,23 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
         }}>
           {product.reference}
         </span>
+        {saleMode && (
+          <div style={{
+            marginTop: '0.4rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.2rem 0.5rem',
+            background: '#eef2ff',
+            color: '#4338ca',
+            borderRadius: '999px',
+            fontSize: '0.7rem',
+            fontWeight: 600
+          }}>
+            <span>{saleMode.emoji}</span>
+            <span>{saleMode.label}</span>
+          </div>
+        )}
       </div>
 
       {/* Price & Stock */}
@@ -597,12 +723,33 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
         marginBottom: '0.5rem',
         flex: 1
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-          <span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 500 }}>Price</span>
-          <span style={{ color: '#1f2937', fontWeight: 700, fontSize: '0.85rem' }}>
-            {product.prixUnitaire} DA
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', alignItems: 'center' }}>
+          <span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 500 }}>Mode de vente</span>
+          <span style={{ color: '#4338ca', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            {saleMode?.emoji} {saleMode?.label}
           </span>
         </div>
+        {priceLines.length > 0 ? (
+          priceLines.map((line) => (
+            <div key={`${product.id}-${line.label}`} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: '0.25rem'
+            }}>
+              <span style={{ color: '#6b7280', fontSize: '0.7rem' }}>{line.label}</span>
+              <span style={{ color: '#1f2937', fontWeight: 700, fontSize: '0.8rem' }}>{line.value}</span>
+            </div>
+          ))
+        ) : (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginBottom: '0.25rem'
+          }}>
+            <span style={{ color: '#6b7280', fontSize: '0.7rem' }}>Prix</span>
+            <span style={{ color: '#9ca3af', fontWeight: 600, fontSize: '0.75rem' }}>Non défini</span>
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 500 }}>Stock</span>
           <span style={{ 
@@ -649,13 +796,15 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
         if (!product.lot_de_stock || product.lot_de_stock.length === 0) return null;
         
         const now = new Date();
-        const sixMonthsFromNow = new Date();
-        sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+        const threeMonthsFromNow = new Date();
+        threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
         
         const expiringLots = product.lot_de_stock.filter(lot => {
           if (!lot.date_expiration) return false;
+          // Ignore lots with no remaining quantity
+          if (typeof lot.quantite_restante === 'number' && lot.quantite_restante <= 0) return false;
           const expirationDate = new Date(lot.date_expiration);
-          return expirationDate > now && expirationDate <= sixMonthsFromNow;
+          return expirationDate > now && expirationDate <= threeMonthsFromNow;
         });
         
         if (expiringLots.length === 0) return null;
@@ -684,6 +833,9 @@ const ProductCard = ({ product, onViewDetails, onEdit, onDelete }) => {
 
 // List View Item Component
 const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
+  const priceLines = getPriceLines(product);
+  const saleMode = getSaleModeBadge(product?.modeVente);
+
   return (
     <div 
       onClick={() => onViewDetails()}
@@ -753,6 +905,22 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
           }}>
             {product.reference}
           </span>
+          {saleMode && (
+            <span style={{
+              background: '#eef2ff',
+              color: '#4338ca',
+              padding: '0.25rem 0.6rem',
+              borderRadius: '999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+              <span>{saleMode.emoji}</span>
+              <span>{saleMode.label}</span>
+            </span>
+          )}
         </div>
         {product.description && (
           <p style={{ 
@@ -767,10 +935,18 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
             {product.description}
           </p>
         )}
-        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
-            <span style={{ color: '#6b7280' }}>Price: </span>
-            <span style={{ fontWeight: 700, color: '#1f2937' }}>{product.prixUnitaire} DA</span>
+            <span style={{ color: '#6b7280', display: 'block' }}>Prix:</span>
+            {priceLines.length > 0 ? (
+              priceLines.map((line) => (
+                <div key={`${product.id}-${line.label}`} style={{ fontWeight: 700, color: '#1f2937', fontSize: '0.85rem' }}>
+                  {line.label}: {line.value}
+                </div>
+              ))
+            ) : (
+              <div style={{ color: '#9ca3af', fontWeight: 600 }}>Non défini</div>
+            )}
           </div>
           <div>
             <span style={{ color: '#6b7280' }}>Stock: </span>
@@ -809,13 +985,13 @@ const ProductListItem = ({ product, onViewDetails, onEdit, onDelete }) => {
             if (!product.lot_de_stock || product.lot_de_stock.length === 0) return null;
             
             const now = new Date();
-            const sixMonthsFromNow = new Date();
-            sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+            const threeMonthsFromNow = new Date();
+            threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
             
             const expiringLots = product.lot_de_stock.filter(lot => {
               if (!lot.date_expiration) return false;
               const expirationDate = new Date(lot.date_expiration);
-              return expirationDate > now && expirationDate <= sixMonthsFromNow;
+              return expirationDate > now && expirationDate <= threeMonthsFromNow;
             });
             
             if (expiringLots.length === 0) return null;

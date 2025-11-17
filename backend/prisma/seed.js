@@ -133,7 +133,7 @@ async function main() {
   });
 
   console.log('✅ Created 2 users:');
-  console.log('   🔑 Password for both: password123\n');
+  console.log('   🔑 Password for both: djalildjt\n');
 
   // ============================================
   // SEED CLIENTS
@@ -153,8 +153,8 @@ async function main() {
     prisma.client.create({
       data: {
         nom: 'Bouras',
-        prenom: 'Sarah',
-        email: 'sarah.bouras@email.com',
+        prenom: 'Salah',
+        email: 'salah.bouras@email.com',
         telephone: '0666234567',
         adresse: '45 Avenue Pasteur, Oran',
         type: 'PEINTRE',
@@ -180,22 +180,19 @@ async function main() {
   // SEED PRODUCTS (PRODUITS)
   // ============================================
   const produits = await Promise.all([
-    // Paint products (sold by KG)
+    // TOTAL sale only
     prisma.produit.create({
       data: {
         reference: 'P-001',
         nom: 'Peinture Loggia Blanc Mat 30kg',
         description: 'Peinture murale intérieure mate, excellente couverture',
-        prixUnitaire: 500, // 500 DA per kg
-        prixTotal: 15000, // 30kg × 500
+        modeVente: 'TOTAL',
+        prixTotal: 15000,
         poids: 30,
-        uniteMesure: 'KG',
-        quantite_depos: 100,
-        quantite_stock: 100,
-        seuilAlerte: 20,
-        venduParUnite: true, // Can sell partial kg (e.g., 5.5kg)
-        marqueId: marques[0].id, // Loggia
-        categorieId: categories[0].id, // peinture
+        quantite_stock: 50,
+        seuilAlerte: 10,
+        marqueId: marques[0].id,
+        categorieId: categories[0].id,
         actif: true,
       },
     }),
@@ -204,68 +201,94 @@ async function main() {
         reference: 'P-002',
         nom: 'Peinture Casapaint Bleu Océan 25kg',
         description: 'Peinture acrylique pour intérieur et extérieur',
-        prixUnitaire: 600,
-        prixTotal: 15000,
+        modeVente: 'TOTAL',
+        prixTotal: 13000,
         poids: 25,
-        uniteMesure: 'KG',
-        quantite_depos: 80,
-        quantite_stock: 80,
-        seuilAlerte: 15,
-        venduParUnite: true,
-        marqueId: marques[4].id, // Casapaint
+        quantite_stock: 40,
+        seuilAlerte: 8,
+        marqueId: marques[4].id,
         categorieId: categories[0].id,
         actif: true,
       },
     }),
+
+    // PARTIAL sale only
     prisma.produit.create({
       data: {
         reference: 'P-003',
-        nom: 'Peinture Valpaint Rouge Passion 20kg',
-        description: 'Peinture décorative effet velours',
-        prixUnitaire: 800,
-        prixTotal: 16000,
-        poids: 20,
+        nom: 'Pigment Pigma Color Rouge 1kg',
+        description: 'Pigment concentré pour mélange personnalisé',
+        modeVente: 'PARTIAL',
+        prixPartiel: 1200,
         uniteMesure: 'KG',
-        quantite_depos: 50,
-        quantite_stock: 50,
-        seuilAlerte: 10,
-        venduParUnite: true,
-        marqueId: marques[5].id, // Valpaint
+        quantite_stock: 25,
+        seuilAlerte: 5,
+        marqueId: marques[2].id,
         categorieId: categories[0].id,
         actif: true,
       },
     }),
-    
-    // Tools (sold by PIECE only)
     prisma.produit.create({
       data: {
         reference: 'P-004',
-        nom: 'Pinceau Rolux Professionnel N°12',
-        description: 'Pinceau plat en soie naturelle, manche bois',
-        prixUnitaire: 800,
-        prixTotal: 800,
-        uniteMesure: 'PIECE',
-        quantite_depos: 150,
-        quantite_stock: 150,
-        seuilAlerte: 30,
-        venduParUnite: false, // Only whole pieces
-        marqueId: marques[3].id, // Rolux
-        categorieId: categories[3].id, // outil
+        nom: 'Vernis Protecteur 5L',
+        description: 'Vernis transparent pour finitions mates',
+        modeVente: 'PARTIAL',
+        prixPartiel: 900,
+        uniteMesure: 'LITRE',
+        quantite_stock: 18,
+        seuilAlerte: 4,
+        marqueId: marques[1].id,
+        categorieId: categories[0].id,
+        actif: true,
+      },
+    }),
+
+    // BOTH sale modes
+    prisma.produit.create({
+      data: {
+        reference: 'P-005',
+        nom: 'Peinture Valpaint Rouge Passion 20kg',
+        description: 'Peinture décorative effet velours',
+        modeVente: 'BOTH',
+        prixTotal: 18000,
+        prixPartiel: 950,
+        uniteMesure: 'KG',
+        quantite_stock: 35,
+        seuilAlerte: 7,
+        marqueId: marques[5].id,
+        categorieId: categories[0].id,
         actif: true,
       },
     }),
     prisma.produit.create({
       data: {
-        reference: 'P-005',
-        nom: 'Rouleau Rolux 25cm',
-        description: 'Rouleau en mousse haute densité',
-        prixUnitaire: 1200,
-        prixTotal: 1200,
+        reference: 'P-006',
+        nom: 'Peinture Murale Premium 5L',
+        description: 'Peinture blanche premium, couvre 50 m²',
+        modeVente: 'BOTH',
+        prixTotal: 7000,
+        prixPartiel: 1600,
+        uniteMesure: 'LITRE',
+        quantite_stock: 22,
+        seuilAlerte: 6,
+        marqueId: marques[0].id,
+        categorieId: categories[0].id,
+        actif: true,
+      },
+    }),
+
+    // Tools sold totally
+    prisma.produit.create({
+      data: {
+        reference: 'P-007',
+        nom: 'Pinceau Rolux Professionnel N°12',
+        description: 'Pinceau plat en soie naturelle, manche bois',
+        modeVente: 'TOTAL',
+        prixTotal: 900,
         uniteMesure: 'PIECE',
-        quantite_depos: 100,
-        quantite_stock: 100,
-        seuilAlerte: 20,
-        venduParUnite: false,
+        quantite_stock: 120,
+        seuilAlerte: 25,
         marqueId: marques[3].id,
         categorieId: categories[3].id,
         actif: true,
@@ -273,16 +296,14 @@ async function main() {
     }),
     prisma.produit.create({
       data: {
-        reference: 'P-006',
-        nom: 'Spatule Professionnelle 10cm',
-        description: 'Spatule en acier inoxydable, manche ergonomique',
-        prixUnitaire: 650,
-        prixTotal: 650,
+        reference: 'P-008',
+        nom: 'Rouleau Rolux 25cm',
+        description: 'Rouleau en mousse haute densité',
+        modeVente: 'TOTAL',
+        prixTotal: 1400,
         uniteMesure: 'PIECE',
-        quantite_depos: 80,
-        quantite_stock: 80,
-        seuilAlerte: 15,
-        venduParUnite: false,
+        quantite_stock: 90,
+        seuilAlerte: 18,
         marqueId: marques[3].id,
         categorieId: categories[3].id,
         actif: true,
@@ -314,31 +335,31 @@ async function main() {
     prisma.ligneAchat.create({
       data: {
         achatId: sampleAchat.id,
-        produitId: produits[0].id, // Peinture Loggia 30kg
-        quantite: 30,
-        prixUnitaire: 500,
-        sousTotal: 15000,
+        produitId: produits[4].id, // Produit BOTH (kg)
+        quantite: 10,
+        prixUnitaire: 950,
+        sousTotal: 9500,
       },
     }),
     prisma.ligneAchat.create({
       data: {
         achatId: sampleAchat.id,
-        produitId: produits[3].id, // Pinceau
-        quantite: 5,
-        prixUnitaire: 800,
-        sousTotal: 4000,
+        produitId: produits[6].id, // Pinceau TOTAL
+        quantite: 8,
+        prixUnitaire: 900,
+        sousTotal: 7200,
       },
     }),
   ]);
 
   // Update product stock
   await prisma.produit.update({
-    where: { id: produits[0].id },
-    data: { quantite_stock: 70 }, // 100 - 30
+    where: { id: produits[4].id },
+    data: { quantite_stock: 25 },
   });
   await prisma.produit.update({
-    where: { id: produits[3].id },
-    data: { quantite_stock: 145 }, // 150 - 5
+    where: { id: produits[6].id },
+    data: { quantite_stock: 112 },
   });
 
   console.log('✅ Created 1 sample purchase:');

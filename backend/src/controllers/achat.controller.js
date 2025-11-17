@@ -1,6 +1,8 @@
 import prisma from '../config/db.js';
 import { logger } from '../utils/logger.js';
 import { asyncHandler } from '../middlewares/error.middleware.js';
+import { retirerStock } from '../services/stock.service.js';
+import { computeSalePrice } from '../services/produit.service.js';
 
 /**
  * Get all purchases
@@ -264,133 +266,176 @@ export const createAchat = asyncHandler(async (req, res) => {
     });
   }
 
-  // Calculate totals
-  let prix_total = 0;
-  
-  for (const ligne of ligneAchats) {
-    const produit = await prisma.produit.findUnique({
-      where: { id: ligne.produitId }
-    });
-
-    if (!produit) {
-      return res.status(404).json({
-        error: 'Not Found',
-        message: `Product with id ${ligne.produitId} not found`
-      });
-    }
-
-    // Check stock availability
-    // Si le produit a un poids défini et que l'unité de mesure est KG,
-    // convertir les kg achetés en fraction de pièce pour la validation
-    let quantiteToCheck = ligne.quantite;
-    if (produit.poids && produit.uniteMesure === 'KG' && produit.venduParUnite) {
-      // Convertir les kg achetés en fraction de pièce
-      quantiteToCheck = ligne.quantite / produit.poids;
-    }
-    
-    if (quantiteToCheck > produit.quantite_stock) {
-      // Formater le message d'erreur selon le type de produit
-      let availableStock = produit.quantite_stock;
-      if (produit.poids && produit.uniteMesure === 'KG' && produit.venduParUnite) {
-        const piecesCompletes = Math.floor(produit.quantite_stock);
-        const resteEnKg = (produit.quantite_stock - piecesCompletes) * produit.poids;
-        if (resteEnKg > 0 && piecesCompletes > 0) {
-          availableStock = `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''} et ${resteEnKg.toFixed(2)} kg`;
-        } else if (piecesCompletes > 0) {
-          availableStock = `${piecesCompletes} pièce${piecesCompletes > 1 ? 's' : ''}`;
-        } else {
-          availableStock = `${resteEnKg.toFixed(2)} kg`;
-        }
-      } else {
-        availableStock = `${produit.quantite_stock} ${produit.uniteMesure}`;
-      }
-      
-      return res.status(400).json({
-        error: 'Validation Error',
-        message: `Insufficient stock for ${produit.nom}. Available: ${availableStock}`
-      });
-    }
-
-    const prixLigne = (ligne.prixUnitaire || produit.prixUnitaire) * ligne.quantite;
-    prix_total += prixLigne - (ligne.remise || 0);
-  }
-
-  const remise = remiseGlobale || 0;
-  const prix_total_remise = prix_total - remise;
-
-  // Create achat with ligneAchats
-  const achat = await prisma.achat.create({
-    data: {
-      numeroBon: `BON-${Date.now()}`,
-      clientId: parseInt(clientId),
-      utilisateurId: req.user.id,
-      prix_total,
-      remiseGlobale: remise,
-      prix_total_remise,
-      notes,
-      versment: parseFloat(versment) || 0,
-      ligneAchats: {
-        create: ligneAchats.map(ligne => ({
-          produitId: ligne.produitId,
-          quantite: ligne.quantite,
-          prixUnitaire: ligne.prixUnitaire || undefined,
-          remise: ligne.remise || 0,
-          sousTotal: ligne.quantite * (ligne.prixUnitaire || 0) - (ligne.remise || 0)
-        }))
+  const includeRelations = {
+    client: true,
+    utilisateur: {
+      select: {
+        id: true,
+        nom: true,
+        prenom: true
       }
     },
-    include: {
-      client: true,
-      utilisateur: {
-        select: {
-          id: true,
-          nom: true,
-          prenom: true
-        }
-      },
-      ligneAchats: {
-        include: {
-          produit: {
-            include: {
-              marque: true,
-              categorie: true
-            }
+    ligneAchats: {
+      include: {
+        produit: {
+          include: {
+            marque: true,
+            categorie: true
           }
         }
       }
     }
-  });
+  };
 
-  // Update stock for each product
-  for (const ligne of ligneAchats) {
-    const produit = await prisma.produit.findUnique({
-      where: { id: ligne.produitId }
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      let prix_total = 0;
+      const preparedLines = [];
+
+      for (const ligne of ligneAchats) {
+        const produit = await tx.produit.findUnique({
+          where: { id: ligne.produitId }
+        });
+
+        if (!produit || produit.deleted) {
+          throw Object.assign(new Error(`Product with id ${ligne.produitId} not found`), {
+            status: 404,
+            error: 'Not Found'
+          });
+        }
+
+        if (!produit.actif) {
+          throw Object.assign(new Error(`Product ${produit.nom} is not active`), {
+            status: 400,
+            error: 'Validation Error'
+          });
+        }
+
+        const quantite = Number(ligne.quantite);
+        if (!Number.isFinite(quantite) || quantite <= 0) {
+          throw Object.assign(new Error(`Invalid quantity for ${produit.nom}`), {
+            status: 400,
+            error: 'Validation Error'
+          });
+        }
+
+        const vendreTotal = Boolean(ligne.vendreTotal);
+
+        const { montant, prixUtilise, quantiteRetrait } = computeSalePrice({
+          modeVente: produit.modeVente,
+          prixTotal: produit.prixTotal,
+          prixPartiel: produit.prixPartiel,
+          uniteMesure: produit.uniteMesure,
+          poids: produit.poids,
+          quantite,
+          vendreTotal
+        });
+
+        const remiseLigne = Number(ligne.remise) || 0;
+        if (remiseLigne < 0) {
+          throw Object.assign(new Error(`Invalid discount for ${produit.nom}`), {
+            status: 400,
+            error: 'Validation Error'
+          });
+        }
+
+        const sousTotal = montant - remiseLigne;
+        if (sousTotal < 0) {
+          throw Object.assign(new Error(`Discount exceeds line total for ${produit.nom}`), {
+            status: 400,
+            error: 'Validation Error'
+          });
+        }
+
+        // Stock withdrawal inside transaction to avoid race conditions
+        await retirerStock(produit.id, quantiteRetrait, tx);
+
+        prix_total += sousTotal;
+        // Only persist fields that exist on LigneAchat in Prisma schema
+        preparedLines.push({
+          produitId: produit.id,
+          quantite,
+          prixUnitaire: prixUtilise,
+          remise: remiseLigne,
+          sousTotal
+        });
+      }
+
+      const remise = Number(remiseGlobale) || 0;
+      if (remise < 0) {
+        throw Object.assign(new Error('Global discount must be positive'), {
+          status: 400,
+          error: 'Validation Error'
+        });
+      }
+
+      const prix_total_remise = prix_total - remise;
+      if (prix_total_remise < 0) {
+        throw Object.assign(new Error('Global discount exceeds total amount'), {
+          status: 400,
+          error: 'Validation Error'
+        });
+      }
+      const versmentValue = Number(versment) || 0;
+      if (versmentValue < 0) {
+        throw Object.assign(new Error('Versment must be positive'), {
+          status: 400,
+          error: 'Validation Error'
+        });
+      }
+
+      // 1. Create achat with a temporary numeroBon (required non-null field)
+      const createdAchat = await tx.achat.create({
+        data: {
+          numeroBon: 'TEMP',
+          clientId: parseInt(clientId),
+          utilisateurId: req.user.id,
+          prix_total,
+          remiseGlobale: remise,
+          prix_total_remise,
+          notes,
+          versment: versmentValue,
+          ligneAchats: {
+            create: preparedLines
+          }
+        }
+      });
+
+      // 2. Generate numeroBon based on current date + auto-incremented id
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const datePart = `${yyyy}${mm}${dd}`;
+      const idPart = String(createdAchat.id).padStart(6, '0');
+      const numeroBon = `${datePart}-${idPart}`;
+
+      // 3. Update achat with the final numeroBon and return full object with relations
+      const achat = await tx.achat.update({
+        where: { id: createdAchat.id },
+        data: { numeroBon },
+        include: includeRelations
+      });
+
+      return achat;
     });
 
-    if (!produit) continue;
-
-    let quantiteToDecrement = ligne.quantite;
-
-    // Si le produit a un poids défini et que l'unité de mesure est KG,
-    // convertir les kg achetés en fraction de pièce
-    if (produit.poids && produit.uniteMesure === 'KG' && produit.venduParUnite) {
-      // Convertir les kg achetés en fraction de pièce
-      // Par exemple: 2 kg / 10 kg = 0.2 pièce
-      quantiteToDecrement = ligne.quantite / produit.poids;
+    logger.success(`Purchase created: ${result.numeroBon}`);
+    return res.status(201).json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        error: error.error,
+        message: error.message
+      });
     }
 
-    await prisma.produit.update({
-      where: { id: ligne.produitId },
-      data: {
-        quantite_stock: {
-          decrement: quantiteToDecrement
-        }
-      }
+    logger.error('Failed to create purchase', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create purchase'
     });
   }
-
-  logger.success(`Purchase created: ${achat.numeroBon}`);
-  res.status(201).json(achat);
 });
 
 /**
@@ -423,6 +468,47 @@ export const addAchatVersment = asyncHandler(async (req, res) => {
     return res.status(400).json({
       error: 'Validation Error',
       message: 'versment must be a positive number'
+    });
+  }
+
+  // Récupérer l'achat avec les retours pour calculer le prix effectif après retours
+  const achat = await prisma.achat.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      retours: {
+        include: {
+          ligneRetours: true
+        }
+      }
+    }
+  });
+
+  if (!achat) {
+    return res.status(404).json({
+      error: 'Not Found',
+      message: 'Purchase not found'
+    });
+  }
+
+  // Calculer le montant total retourné (même logique que getAchatById)
+  let totalReturned = 0;
+  if (achat.retours && achat.retours.length > 0) {
+    for (const retour of achat.retours) {
+      if (retour.ligneRetours && retour.ligneRetours.length > 0) {
+        for (const ligneRetour of retour.ligneRetours) {
+          totalReturned += ligneRetour.montantLigne || 0;
+        }
+      }
+    }
+  }
+
+  const prix_effectif = Math.max(0, achat.prix_total_remise - totalReturned);
+  const resteAPayer = Math.max(0, prix_effectif - (achat.versment || 0));
+
+  if (amountToAdd > resteAPayer) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: `Payment exceeds remaining amount. Maximum allowed: ${resteAPayer.toFixed(2)}`
     });
   }
 

@@ -17,8 +17,42 @@ import categorieRoutes from './routes/categorie.routes.js';
 const app = express();
 
 // Middleware
+const isPrivateNetworkHost = (hostname) => {
+  if (!hostname) return false;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  if (hostname === '::1') return true;
+  if (hostname.endsWith('.local')) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return true;
+  return false;
+};
+
 app.use(cors({
-  origin: config.corsOrigin,
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (config.corsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    if (config.allowLocalNetworkOrigins) {
+      try {
+        const { hostname } = new URL(origin);
+        if (isPrivateNetworkHost(hostname)) {
+          logger.info(`Allowing local network origin: ${origin}`);
+          return callback(null, true);
+        }
+      } catch (error) {
+        logger.warn(`Failed to parse origin "${origin}": ${error.message}`);
+      }
+    }
+
+    logger.warn(`Blocked request from origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images

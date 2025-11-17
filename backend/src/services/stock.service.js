@@ -47,7 +47,8 @@ import prisma from '../config/db.js';
  * @returns {Promise<Object>} - Object containing withdrawal details and updated product
  * @throws {Error} - If product not found, insufficient stock, or invalid quantity
  */
-export const retirerStock = async (produitId, quantiteDemandee) => {
+export const retirerStock = async (produitId, quantiteDemandee, prismaClient = prisma) => {
+  const client = prismaClient || prisma;
   // Validate input parameters
   if (!produitId || isNaN(produitId)) {
     throw new Error('Product ID is required and must be a valid number');
@@ -58,7 +59,7 @@ export const retirerStock = async (produitId, quantiteDemandee) => {
   }
 
   // Fetch the product with its current stock and lots
-  const produit = await prisma.produit.findUnique({
+  const produit = await client.produit.findUnique({
     where: { id: parseInt(produitId) },
     include: {
       lot_de_stock: {
@@ -100,7 +101,7 @@ export const retirerStock = async (produitId, quantiteDemandee) => {
     const newQuantiteStock = produit.quantite_stock - quantiteDemandee;
 
     // Update the product's stock directly
-    const updatedProduit = await prisma.produit.update({
+    const updatedProduit = await client.produit.update({
       where: { id: parseInt(produitId) },
       data: {
         quantite_stock: newQuantiteStock
@@ -135,14 +136,17 @@ export const retirerStock = async (produitId, quantiteDemandee) => {
   const lotsDisponibles = produit.lot_de_stock.filter(lot => {
     // If lot has no expiration date, include it (shouldn't happen for perishable, but handle it)
     if (!lot.date_expiration) {
-      return true;
+      return (lot.quantite_restante ?? lot.quantite) > 0;
     }
     // Include only non-expired lots
-    return new Date(lot.date_expiration) > now;
+    return new Date(lot.date_expiration) > now && (lot.quantite_restante ?? lot.quantite) > 0;
   });
 
   // Check if we have enough stock in available (non-expired) lots
-  const stockDisponible = lotsDisponibles.reduce((sum, lot) => sum + lot.quantite, 0);
+  const stockDisponible = lotsDisponibles.reduce(
+    (sum, lot) => sum + (lot.quantite_restante ?? lot.quantite),
+    0
+  );
   if (stockDisponible < quantiteDemandee) {
     throw new Error(
       `Insufficient stock in available lots. Available: ${stockDisponible}, Requested: ${quantiteDemandee}`
@@ -156,35 +160,24 @@ export const retirerStock = async (produitId, quantiteDemandee) => {
     }
 
     // Determine how much to withdraw from this lot
-    const quantiteALot = Math.min(lot.quantite, quantiteRestante);
+    const quantiteDisponibleLot = lot.quantite_restante ?? lot.quantite;
+    const quantiteALot = Math.min(quantiteDisponibleLot, quantiteRestante);
 
-    if (quantiteALot === lot.quantite) {
-      // This lot will be completely consumed - delete it
-      await prisma.lotDeStock.delete({
-        where: { id: lot.id }
-      });
-      lotsModifies.push({
-        lotId: lot.id,
-        action: 'deleted',
-        quantity: lot.quantite
-      });
-    } else {
-      // This lot will be partially consumed - update it
-      const nouvelleQuantite = lot.quantite - quantiteALot;
-      await prisma.lotDeStock.update({
-        where: { id: lot.id },
-        data: {
-          quantite: nouvelleQuantite
-        }
-      });
-      lotsModifies.push({
-        lotId: lot.id,
-        action: 'updated',
-        oldQuantity: lot.quantite,
-        newQuantity: nouvelleQuantite,
-        withdrawnQuantity: quantiteALot
-      });
-    }
+    // This lot will be complètement ou partiellement consommé - on met à jour quantite_restante
+    const nouvelleQuantiteRestante = quantiteDisponibleLot - quantiteALot;
+    await client.lotDeStock.update({
+      where: { id: lot.id },
+      data: {
+        quantite_restante: nouvelleQuantiteRestante
+      }
+    });
+    lotsModifies.push({
+      lotId: lot.id,
+      action: 'updated',
+      oldQuantity: quantiteDisponibleLot,
+      newQuantity: nouvelleQuantiteRestante,
+      withdrawnQuantity: quantiteALot
+    });
 
     // Reduce the remaining quantity to withdraw
     quantiteRestante -= quantiteALot;
@@ -192,7 +185,7 @@ export const retirerStock = async (produitId, quantiteDemandee) => {
 
   // Recalculate quantite_stock from remaining lots
   // This ensures quantite_stock always reflects the actual available stock
-  const lotsRestants = await prisma.lotDeStock.findMany({
+  const lotsRestants = await client.lotDeStock.findMany({
     where: {
       produitId: parseInt(produitId),
       // Only count non-expired lots for perishable products
@@ -204,10 +197,13 @@ export const retirerStock = async (produitId, quantiteDemandee) => {
     }
   });
 
-  const nouveauStock = lotsRestants.reduce((sum, lot) => sum + lot.quantite, 0);
+  const nouveauStock = lotsRestants.reduce(
+    (sum, lot) => sum + (lot.quantite_restante ?? lot.quantite),
+    0
+  );
 
   // Update the product's quantite_stock to match the actual available stock
-  const updatedProduit = await prisma.produit.update({
+  const updatedProduit = await client.produit.update({
     where: { id: parseInt(produitId) },
     data: {
       quantite_stock: nouveauStock

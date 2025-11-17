@@ -186,6 +186,21 @@ const AchatList = () => {
   const generatePDF = async () => {
     if (!selectedAchat) return;
 
+    // Filtrer les lignes complètement retournées
+    const filteredLines = (selectedAchat.ligneAchats || []).filter((ligne) => {
+      const returnedQty = (ligne.ligneRetours || []).reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0);
+      return returnedQty < ligne.quantite;
+    });
+
+    // Calculer les montants effectifs en tenant compte des retours
+    const totalReturns = parseFloat(selectedAchat.montant_retourne || 0);
+    const prixTotalRemise = parseFloat(selectedAchat.prix_total_remise || 0);
+    const prixEffectif = typeof selectedAchat.prix_effectif === 'number'
+      ? selectedAchat.prix_effectif
+      : Math.max(0, prixTotalRemise - totalReturns);
+    const versment = parseFloat(selectedAchat.versment || 0);
+    const resteAPayer = Math.max(0, prixEffectif - versment);
+
     try {
       // Dynamic import for PDF library
       const { default: jsPDF } = await import('jspdf');
@@ -218,8 +233,8 @@ const AchatList = () => {
         doc.text(`Email: ${selectedAchat.client.email}`, 14, 86);
       }
 
-      // Items Table
-      const tableData = selectedAchat.ligneAchats?.map((ligne) => [
+      // Items Table (sans les lignes totalement retournées)
+      const tableData = filteredLines.map((ligne) => [
         ligne.produit?.nom || 'N/A',
         `${ligne.quantite} ${ligne.produit?.uniteMesure || ''}`,
         `${parseFloat(ligne.prixUnitaire).toFixed(2)} DA`,
@@ -278,17 +293,18 @@ const AchatList = () => {
       doc.setFontSize(11);
       doc.text(`Sous-total: ${parseFloat(selectedAchat.prix_total || 0).toFixed(2)} DA`, pageWidth - 20, finalY + 7, { align: 'right' });
       doc.text(`Remise globale: ${parseFloat(selectedAchat.remiseGlobale || 0).toFixed(2)} DA`, pageWidth - 20, finalY + 14, { align: 'right' });
+      doc.text(`Montant retours: ${totalReturns.toFixed(2)} DA`, pageWidth - 20, finalY + 21, { align: 'right' });
       
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
       doc.setTextColor(102, 126, 234);
-      doc.text(`TOTAL: ${parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA`, pageWidth - 20, finalY + 22, { align: 'right' });
+      doc.text(`TOTAL EFFECTIF: ${prixEffectif.toFixed(2)} DA`, pageWidth - 20, finalY + 29, { align: 'right' });
       doc.setTextColor(0, 0, 0);
 
       // Versement & Reste
       doc.setFontSize(11);
-      doc.text(`Versement: ${parseFloat(selectedAchat.versment || 0).toFixed(2)} DA`, pageWidth - 20, finalY + 29, { align: 'right' });
-      doc.text(`Reste: ${(Math.max(0, (parseFloat(selectedAchat.prix_total_remise || 0) - parseFloat(selectedAchat.versment || 0))).toFixed(2))} DA`, pageWidth - 20, finalY + 36, { align: 'right' });
+      doc.text(`Versement: ${versment.toFixed(2)} DA`, pageWidth - 20, finalY + 36, { align: 'right' });
+      doc.text(`Reste: ${resteAPayer.toFixed(2)} DA`, pageWidth - 20, finalY + 43, { align: 'right' });
 
       // Notes
       if (selectedAchat.notes) {
@@ -312,7 +328,22 @@ const AchatList = () => {
 
   const printPDF = () => {
     if (!selectedAchat) return;
-    
+
+    // Filtrer les lignes complètement retournées
+    const filteredLines = (selectedAchat.ligneAchats || []).filter((ligne) => {
+      const returnedQty = (ligne.ligneRetours || []).reduce((sum, lr) => sum + (lr.quantiteRetournee || 0), 0);
+      return returnedQty < ligne.quantite;
+    });
+
+    // Calculer les montants effectifs en tenant compte des retours
+    const totalReturns = parseFloat(selectedAchat.montant_retourne || 0);
+    const prixTotalRemise = parseFloat(selectedAchat.prix_total_remise || 0);
+    const prixEffectif = typeof selectedAchat.prix_effectif === 'number'
+      ? selectedAchat.prix_effectif
+      : Math.max(0, prixTotalRemise - totalReturns);
+    const versment = parseFloat(selectedAchat.versment || 0);
+    const resteAPayer = Math.max(0, prixEffectif - versment);
+
     // Create a print-friendly window
     const printWindow = window.open('', '_blank');
     const printContent = `
@@ -418,7 +449,7 @@ const AchatList = () => {
             </tr>
           </thead>
           <tbody>
-            ${selectedAchat.ligneAchats?.map(ligne => `
+            ${filteredLines.map(ligne => `
               <tr>
                 <td>${ligne.produit?.nom || 'N/A'}</td>
                 <td>${ligne.quantite} ${ligne.produit?.uniteMesure || ''}</td>
@@ -433,9 +464,10 @@ const AchatList = () => {
         <div class="totals">
           <div><strong>Sous-total:</strong> ${parseFloat(selectedAchat.prix_total || 0).toFixed(2)} DA</div>
           <div><strong>Remise globale:</strong> ${parseFloat(selectedAchat.remiseGlobale || 0).toFixed(2)} DA</div>
-          <div><strong>Versement:</strong> ${parseFloat(selectedAchat.versment || 0).toFixed(2)} DA</div>
-          <div><strong>Reste:</strong> ${(Math.max(0, (parseFloat(selectedAchat.prix_total_remise || 0) - parseFloat(selectedAchat.versment || 0))).toFixed(2))} DA</div>
-          <div class="total-final"><strong>TOTAL: ${parseFloat(selectedAchat.prix_total_remise || 0).toFixed(2)} DA</strong></div>
+          <div><strong>Montant retours:</strong> ${totalReturns.toFixed(2)} DA</div>
+          <div class="total-final"><strong>TOTAL EFFECTIF: ${prixEffectif.toFixed(2)} DA</strong></div>
+          <div><strong>Versement:</strong> ${versment.toFixed(2)} DA</div>
+          <div><strong>Reste:</strong> ${resteAPayer.toFixed(2)} DA</div>
         </div>
         
         ${selectedAchat.notes ? `
@@ -521,13 +553,20 @@ const AchatList = () => {
                     return;
                   }
                   const current = parseFloat(selectedAchat.versment || 0);
-                  const totalAllowed = parseFloat(selectedAchat.prix_total_remise || 0);
-                  if (current + amount > totalAllowed) {
-                    setNotification({ open: true, type: 'error', message: `Le versement dépasse le total autorisé. Maximum: ${(totalAllowed - current).toFixed(2)} DA` });
+                  const totalReturns = parseFloat(selectedAchat.montant_retourne || 0);
+                  const prixTotalRemise = parseFloat(selectedAchat.prix_total_remise || 0);
+                  const prixEffectif = typeof selectedAchat.prix_effectif === 'number'
+                    ? selectedAchat.prix_effectif
+                    : Math.max(0, prixTotalRemise - totalReturns);
+                  const resteAPayer = Math.max(0, prixEffectif - current);
+
+                  if (amount > resteAPayer) {
+                    setNotification({ open: true, type: 'error', message: `Le versement dépasse le reste à payer après retours. Maximum: ${resteAPayer.toFixed(2)} DA` });
                     return;
                   }
                   try {
-                    await api.put(`/achats/${selectedAchat.id}/versment`, { amount });
+                    // Le backend attend la propriété "versment" dans le body
+                    await api.put(`/achats/${selectedAchat.id}/versment`, { versment: amount });
                     const refreshed = await api.get(`/achats/${selectedAchat.id}`);
                     setSelectedAchat(refreshed.data);
                     await fetchAchats();

@@ -1,8 +1,157 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
+const ModeVente = {
+  TOTAL: 'TOTAL',
+  PARTIAL: 'PARTIAL',
+  BOTH: 'BOTH'
+};
+
+const formatCurrency = (value) => {
+  if (!Number.isFinite(value)) {
+    return '—';
+  }
+  return `${value.toFixed(2)} DA`;
+};
+
+const computeProductPricing = (product, quantiteInput, vendreTotal) => {
+  if (!product) {
+    return {
+      montant: 0,
+      baseLabel: '',
+      quantiteRetrait: 0,
+      quantiteMesuree: 0,
+      prixUnitaire: 0
+    };
+  }
+
+  const qty = Number(quantiteInput);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return {
+      montant: 0,
+      baseLabel: '',
+      quantiteRetrait: 0,
+      quantiteMesuree: 0,
+      prixUnitaire: 0
+    };
+  }
+
+  switch (product.modeVente) {
+    case ModeVente.TOTAL: {
+      const montant = (product.prixTotal || 0) * qty;
+      return {
+        montant,
+        baseLabel: `Vente totale · ${formatCurrency(product.prixTotal || 0)} / ${product.uniteMesure || 'pièce'}`,
+        quantiteRetrait: qty,
+        quantiteMesuree: qty,
+        prixUnitaire: product.prixTotal || 0
+      };
+    }
+
+    case ModeVente.PARTIAL: {
+      const montant = (product.prixPartiel || 0) * qty;
+      return {
+        montant,
+        baseLabel: `Vente partielle · ${formatCurrency(product.prixPartiel || 0)} / ${product.uniteMesure}`,
+        quantiteRetrait: qty,
+        quantiteMesuree: qty,
+        prixUnitaire: product.prixPartiel || 0
+      };
+    }
+
+    case ModeVente.BOTH: {
+      if (vendreTotal) {
+        const montant = (product.prixTotal || 0) * qty;
+        return {
+          montant,
+          baseLabel: `Vente totale · ${formatCurrency(product.prixTotal || 0)} / ${product.uniteMesure || 'pièce'}`,
+          quantiteRetrait: qty,
+          quantiteMesuree: qty,
+          prixUnitaire: product.prixTotal || 0
+        };
+      }
+
+      const hasValidPoids = product.poids && Number.isFinite(Number(product.poids)) && Number(product.poids) > 0;
+
+      if (hasValidPoids) {
+        const poidsValue = Number(product.poids);
+        // Ici, qty (X) est la quantité en unité mesurée (kg, L, ...)
+        // Prix = prixPartiel * X, retrait de stock = X / poids
+        const quantiteMesuree = qty;
+        const montant = (product.prixPartiel || 0) * quantiteMesuree;
+        const quantiteRetrait = qty / poidsValue;
+        return {
+          montant,
+          baseLabel: `Vente partielle · ${formatCurrency(product.prixPartiel || 0)} / ${product.uniteMesure} (poids ${poidsValue} ${product.uniteMesure} par pièce)`,
+          quantiteRetrait,
+          quantiteMesuree,
+          prixUnitaire: product.prixPartiel || 0
+        };
+      }
+
+      // Pas de poids valide : se comporter comme une vente partielle classique
+      const montant = (product.prixPartiel || 0) * qty;
+      return {
+        montant,
+        baseLabel: `Vente partielle · ${formatCurrency(product.prixPartiel || 0)} / ${product.uniteMesure || 'unité'}`,
+        quantiteRetrait: qty,
+        quantiteMesuree: qty,
+        prixUnitaire: product.prixPartiel || 0
+      };
+    }
+
+    default:
+      return {
+        montant: 0,
+        baseLabel: '',
+        quantiteRetrait: 0,
+        quantiteMesuree: 0,
+        prixUnitaire: 0
+      };
+  }
+};
+
+const inferUnitPrice = (product) => {
+  if (!product) return 0;
+
+  switch (product.modeVente) {
+    case ModeVente.TOTAL:
+      return product.prixTotal ?? product.prixUnitaire ?? 0;
+    case ModeVente.PARTIAL:
+      return product.prixPartiel ?? product.prixUnitaire ?? 0;
+    case ModeVente.BOTH:
+      return product.prixPartiel ?? product.prixUnitaire ?? product.prixTotal ?? 0;
+    default:
+      return product.prixUnitaire ?? 0;
+  }
+};
+
 // Fonction utilitaire pour formater l'affichage du stock
 const formatStockDisplay = (product) => {
+  // Pour les produits vendus en BOTH (total + partiel), on affiche le stock
+  // comme "X unités" et, si un poids est défini, le reste dans l'unité de mesure.
+  if (product.modeVente === ModeVente.BOTH) {
+    const quantiteStock = parseFloat(product.quantite_stock) || 0;
+    const poidsValue = product.poids ? Number(product.poids) : NaN;
+
+    if (product.uniteMesure && Number.isFinite(poidsValue) && poidsValue > 0) {
+      const piecesCompletes = Math.floor(quantiteStock);
+      const resteEnUnite = (quantiteStock - piecesCompletes) * poidsValue;
+
+      if (resteEnUnite > 0 && piecesCompletes > 0) {
+        const piecesLabel = piecesCompletes > 1 ? 'unités' : 'unité';
+        return `${piecesCompletes} ${piecesLabel} et ${resteEnUnite.toFixed(2)} ${product.uniteMesure}`;
+      } else if (piecesCompletes > 0) {
+        const piecesLabel = piecesCompletes > 1 ? 'unités' : 'unité';
+        return `${piecesCompletes} ${piecesLabel}`;
+      } else if (resteEnUnite > 0) {
+        return `${resteEnUnite.toFixed(2)} ${product.uniteMesure}`;
+      }
+    }
+
+    return `${quantiteStock} unité${quantiteStock > 1 ? 's' : ''}`;
+  }
+
   // Si le produit a un poids défini et que l'unité de mesure est KG
   if (product.poids && product.uniteMesure === 'KG' && product.venduParUnite) {
     const quantiteStock = parseFloat(product.quantite_stock) || 0;
@@ -22,261 +171,149 @@ const formatStockDisplay = (product) => {
   return `${product.quantite_stock} ${product.uniteMesure}`;
 };
 
-const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullProduct, viewMode = 'grid' }) => {
-  const defaultQty = product.venduParUnite ? '0.1' : '1';
-  const [quantityInput, setQuantityInput] = useState(cartItem ? cartItem.quantite : defaultQty);
-
-  useEffect(() => {
-    if (cartItem) {
-      setQuantityInput(cartItem.quantite);
-    } else {
-      setQuantityInput(defaultQty);
+const ProductCard = ({ product, cartItem, onAddToCart, onUpdateCart, onAddFullProduct, viewMode }) => {
+  const [localQty, setLocalQty] = useState(() => {
+    if (cartItem?.quantite) {
+      return cartItem.quantite.toString();
     }
-  }, [cartItem, defaultQty]);
-
-  const handleQuantityChange = (e) => {
-    let value = e.target.value;
-    // If not venduParUnite, ensure it's a whole number
-    if (!product.venduParUnite && value && parseFloat(value)) {
-      value = Math.floor(parseFloat(value)).toString();
+    if (product.venduParUnite) {
+      return '0.1';
     }
-    setQuantityInput(value);
-  };
+    return '1';
+  });
 
-  const handleAddToCartClick = () => {
-    const qty = parseFloat(quantityInput);
-    if (isNaN(qty) || qty <= 0) {
-      return;
-    }
-    // Ensure whole number for non-venduParUnite products, one-decimal for floats
-    const finalQty = product.venduParUnite ? Math.round(qty * 10) / 10 : Math.floor(qty);
-    
-    if (cartItem) {
-      onUpdateCart(finalQty.toString());
-    } else {
-      onAddToCart(finalQty.toString());
+  const [vendreTotal, setVendreTotal] = useState(false);
+
+  const { montant, baseLabel, quantiteRetrait, quantiteMesuree, prixUnitaire } = computeProductPricing(
+    product,
+    localQty,
+    product.modeVente === ModeVente.BOTH ? vendreTotal : false
+  );
+
+  const handleChangeQty = (value) => {
+    setLocalQty(value);
+    if (cartItem && onUpdateCart) {
+      onUpdateCart(value);
     }
   };
 
-  const handleBuyFullProduct = () => {
-    if (onAddFullProduct && product.poids && product.prixTotal) {
-      onAddFullProduct(product.poids, product.prixTotal);
+  const handleAddClick = () => {
+    if (onAddToCart) {
+      onAddToCart(localQty, vendreTotal);
     }
   };
 
-  const minValue = product.venduParUnite ? 0.1 : 1;
-  const stepValue = product.venduParUnite ? 0.1 : 1;
-  // Le bouton "Acheter la totalité" est affiché si :
-  // - Le produit est fractionnable (venduParUnite)
-  // - Le produit a un poids défini (paquet complet)
-  // - Le produit a un prixTotal défini
-  // - Il y a au moins une pièce complète disponible (quantite_stock >= 1)
-  const canBuyFull = product.venduParUnite && product.poids && product.prixTotal && product.quantite_stock >= 1;
-
-  const isList = viewMode === 'list';
+  const containerStyle = viewMode === 'grid'
+    ? {
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '0.75rem',
+        borderRadius: '10px',
+        border: cartItem ? '2px solid #667eea' : '1px solid #e5e7eb',
+        background: cartItem ? '#eef2ff' : '#ffffff',
+        boxShadow: cartItem ? '0 4px 10px rgba(99, 102, 241, 0.12)' : '0 1px 3px rgba(15, 23, 42, 0.06)',
+        transition: 'all 0.15s ease',
+        minHeight: '160px'
+      }
+    : {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '0.75rem',
+        borderRadius: '10px',
+        border: cartItem ? '2px solid #667eea' : '1px solid #e5e7eb',
+        background: cartItem ? '#eef2ff' : '#ffffff',
+        boxShadow: cartItem ? '0 4px 10px rgba(99, 102, 241, 0.12)' : '0 1px 3px rgba(15, 23, 42, 0.06)',
+        transition: 'all 0.15s ease'
+      };
 
   return (
-    <div style={{
-      border: '1px solid #e5e7eb',
-      borderRadius: '10px',
-      padding: isList ? '0.6rem' : '0.75rem',
-      background: 'white',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-      transition: 'all 0.15s ease',
-      display: isList ? 'flex' : 'block',
-      alignItems: isList ? 'center' : 'initial',
-      gap: isList ? '0.75rem' : '0'
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.borderColor = '#667eea';
-      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.15)';
-      e.currentTarget.style.transform = 'translateY(-2px)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.borderColor = '#e5e7eb';
-      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
-      e.currentTarget.style.transform = 'translateY(0)';
-    }}
-    >
-      {product.image && (
-        <img
-          src={product.image}
-          alt={product.nom}
+    <div style={containerStyle}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: viewMode === 'grid' ? '0.75rem' : 0 }}>
+        <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#111827' }}>{product.nom}</div>
+        <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+          {product.reference} · Stock: {formatStockDisplay(product)}
+        </div>
+        <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>{baseLabel}</div>
+        <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+          Retrait: {quantiteRetrait} · Mesuré: {quantiteMesuree}
+        </div>
+      </div>
+
+      {product.modeVente === ModeVente.BOTH && (
+        <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.4rem' }}>
+          <button
+            type="button"
+            onClick={() => setVendreTotal(true)}
+            style={{
+              padding: '0.25rem 0.5rem',
+              borderRadius: '999px',
+              border: vendreTotal ? '1px solid #4f46e5' : '1px solid #e5e7eb',
+              background: vendreTotal ? '#4f46e5' : '#ffffff',
+              color: vendreTotal ? '#ffffff' : '#4b5563',
+              fontSize: '0.75rem',
+              cursor: 'pointer'
+            }}
+          >
+            Total
+          </button>
+          <button
+            type="button"
+            onClick={() => setVendreTotal(false)}
+            style={{
+              padding: '0.25rem 0.5rem',
+              borderRadius: '999px',
+              border: !vendreTotal ? '1px solid #4f46e5' : '1px solid #e5e7eb',
+              background: !vendreTotal ? '#4f46e5' : '#ffffff',
+              color: !vendreTotal ? '#ffffff' : '#4b5563',
+              fontSize: '0.75rem',
+              cursor: 'pointer'
+            }}
+          >
+            Partiel
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <input
+          type="number"
+          value={localQty}
+          onChange={(e) => handleChangeQty(e.target.value)}
+          min={product.venduParUnite ? 0.1 : 1}
+          max={product.quantite_stock}
+          step={product.venduParUnite ? 0.1 : 1}
           style={{
-            width: isList ? '64px' : '100%',
-            height: isList ? '64px' : '110px',
-            objectFit: 'contain',
+            width: '80px',
+            padding: '0.35rem 0.4rem',
             borderRadius: '6px',
-            marginBottom: isList ? '0' : '0.4rem',
-            background: '#f5f5f5'
-          }}
-          onError={(e) => {
-            e.target.style.display = 'none';
+            border: '1px solid #d1d5db',
+            fontSize: '0.85rem'
           }}
         />
-      )}
-      <div style={{ 
-        fontWeight: 600, 
-        marginBottom: isList ? '0.15rem' : '0.4rem', 
-        fontSize: '0.95rem', 
-        color: '#1f2937',
-        lineHeight: '1.35'
-      }}>
-        {product.nom}
-      </div>
-      <div style={{ 
-        fontSize: '0.8rem', 
-        color: '#6b7280', 
-        marginBottom: isList ? '0.4rem' : '0.5rem',
-        lineHeight: '1.45'
-      }}>
-        <div style={{ marginBottom: '0.25rem' }}>
-          <strong>Reference:</strong> {product.reference} | <strong>Stock:</strong> {formatStockDisplay(product)}
-      </div>
-        {product.poids && (
-          <div style={{ 
-            marginTop: isList ? '0.25rem' : '0.35rem', 
-            padding: '0.35rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            borderRadius: '6px',
-            fontWeight: 600,
-            fontSize: '0.8rem'
-          }}>
-            📦 Paquet: {product.poids} {product.uniteMesure} - {product.prixTotal} DA
-          </div>
-        )}
-      </div>
-      <div style={{ 
-        fontWeight: 700, 
-        color: '#667eea', 
-        marginBottom: isList ? '0.25rem' : '0.6rem',
-        fontSize: isList ? '0.9rem' : '0.95rem',
-        padding: isList ? '0.25rem 0.4rem' : '0.35rem',
-        background: '#f3f4f6',
-        borderRadius: '6px',
-        textAlign: 'center',
-        alignSelf: isList ? 'flex-start' : 'auto',
-        display: 'inline-block'
-      }}>
-        💰 {product.prixUnitaire} DA / {product.uniteMesure}
-      </div>
-      {isList && (<div style={{ flex: 1 }} />)}
-      
-      {/* Bouton pour acheter la totalité du produit */}
-      {canBuyFull && (
+        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap' }}>
+          {formatCurrency(montant)}
+        </div>
         <button
           type="button"
-          onClick={handleBuyFullProduct}
+          onClick={handleAddClick}
           style={{
-            width: isList ? 'auto' : '100%',
-            padding: isList ? '0.5rem 0.6rem' : '0.55rem 0.7rem',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: 'white',
+            padding: '0.4rem 0.75rem',
+            background: cartItem ? '#22c55e' : '#4f46e5',
+            color: '#ffffff',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '0.8rem',
             fontWeight: 600,
-            marginBottom: isList ? '0' : '0.6rem',
-            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 3px 6px rgba(16, 185, 129, 0.35)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+            transition: 'all 0.15s ease',
+            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.15)',
+            whiteSpace: 'nowrap'
           }}
         >
-          🛒 total ({product.poids} {product.uniteMesure} - {product.prixTotal} DA)
+          {cartItem ? '✓ Update' : '+ Add'}
         </button>
-      )}
-
-      {/* Section pour acheter par quantité spécifiée */}
-      <div style={{ 
-        padding: isList ? '0.2rem' : '0.6rem',
-        background: isList ? 'transparent' : (canBuyFull ? '#f8f9fa' : 'transparent'),
-        borderRadius: '6px',
-        border: isList ? 'none' : (canBuyFull ? '1px solid #e9ecef' : 'none')
-      }}>
-        {canBuyFull && !isList && (
-          <div style={{ 
-            fontSize: '0.72rem', 
-            color: '#666', 
-            marginBottom: '0.4rem',
-            fontWeight: 500,
-            textAlign: 'center'
-          }}>
-            Ou acheter par {product.uniteMesure.toLowerCase()}:
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: isList ? 0 : '0.4rem' }}>
-        <input
-          type="number"
-          value={quantityInput}
-          onChange={handleQuantityChange}
-          min={minValue}
-          max={product.quantite_stock}
-          step={stepValue}
-          inputMode="decimal"
-          placeholder="Qty"
-          style={{
-            flex: isList ? 'unset' : 1,
-              padding: isList ? '0.5rem' : '0.55rem',
-              border: '1.5px solid #e5e7eb',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              transition: 'all 0.15s ease',
-              outline: 'none',
-              width: isList ? '90px' : 'auto'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#667eea';
-              e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#e5e7eb';
-              e.target.style.boxShadow = 'none';
-            if (product.venduParUnite) {
-              const v = parseFloat(e.target.value);
-              if (!isNaN(v) && v > 0) {
-                const rounded = Math.round(v * 10) / 10;
-                setQuantityInput(rounded.toFixed(1));
-              }
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={handleAddToCartClick}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 3px 6px rgba(102, 126, 234, 0.25)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.2)';
-            }}
-          style={{
-              padding: isList ? '0.5rem 0.8rem' : '0.55rem 0.9rem',
-              background: cartItem ? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            border: 'none',
-              borderRadius: '8px',
-            cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              transition: 'all 0.15s ease',
-              boxShadow: '0 2px 4px rgba(102, 126, 234, 0.2)',
-              whiteSpace: 'nowrap'
-          }}
-        >
-            {cartItem ? '✓ Update' : '+ Add'}
-        </button>
-        </div>
       </div>
     </div>
   );
@@ -411,7 +448,7 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
     }
   };
 
-  const addToCart = (product, quantite = null) => {
+  const addToCart = (product, quantite = null, vendreTotal = false) => {
     const qty = quantite || (product.venduParUnite ? '0.1' : '1');
     const parsed = parseFloat(qty);
     const finalQty = product.venduParUnite ? Math.round(parsed * 10) / 10 : Math.floor(parsed);
@@ -421,11 +458,16 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
     }
 
     const existingItem = cart.find(item => item.produitId === product.id);
+
+    const pricing = computeProductPricing(product, finalQty, vendreTotal);
+    const unitPrice = Number.isFinite(Number(pricing.prixUnitaire))
+      ? Number(pricing.prixUnitaire)
+      : inferUnitPrice(product);
     
     if (existingItem) {
       setCart(cart.map(item =>
         item.produitId === product.id
-          ? { ...item, quantite: finalQty.toString() }
+          ? { ...item, quantite: finalQty.toString(), prixUnitaire: unitPrice, vendreTotal }
           : item
       ));
     } else {
@@ -433,10 +475,12 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
         produitId: product.id,
         nom: product.nom,
         quantite: finalQty.toString(),
-        prixUnitaire: product.prixUnitaire,
+        prixUnitaire: unitPrice,
         remise: '0',
         maxQuantite: product.quantite_stock,
-        venduParUnite: product.venduParUnite
+        venduParUnite: product.venduParUnite,
+        vendreTotal,
+        modeVente: product.modeVente
       }]);
     }
   };
@@ -556,7 +600,8 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
           produitId: item.produitId,
           quantite: parseFloat(item.quantite),
           prixUnitaire: parseFloat(item.prixUnitaire),
-          remise: parseFloat(item.remise) || 0
+          remise: parseFloat(item.remise) || 0,
+          vendreTotal: Boolean(item.vendreTotal)
         }))
       };
 
@@ -572,9 +617,23 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
   const calculateTotal = () => {
     let total = 0;
     cart.forEach(item => {
-      total += parseFloat(item.prixUnitaire) * parseFloat(item.quantite) - (parseFloat(item.remise) || 0);
+      const remise = parseFloat(item.remise);
+      const safeRemise = Number.isFinite(remise) ? remise : 0;
+
+      const product = products.find(p => p.id === item.produitId);
+      const { montant } = computeProductPricing(
+        product,
+        item.quantite,
+        Boolean(item.vendreTotal)
+      );
+
+      total += montant - safeRemise;
     });
-    return total - (parseFloat(formData.remiseGlobale) || 0);
+
+    const remiseGlobale = parseFloat(formData.remiseGlobale);
+    const safeRemiseGlobale = Number.isFinite(remiseGlobale) ? remiseGlobale : 0;
+
+    return total - safeRemiseGlobale;
   };
 
   const filteredClients = clients.filter(client =>
@@ -957,7 +1016,7 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
                     key={product.id}
                     product={product}
                     cartItem={cartItem}
-                    onAddToCart={(qty) => addToCart(product, qty)}
+                    onAddToCart={(qty, vendreTotal) => addToCart(product, qty, vendreTotal)}
                     onUpdateCart={(qty) => updateCartItem(product.id, 'quantite', qty)}
                     onAddFullProduct={(poids, prixTotal) => addFullProductToCart(product.id, poids, prixTotal)}
                     viewMode={viewMode}
@@ -977,60 +1036,96 @@ const AchatForm = ({ onSuccess, onCancel, inline = false, initialClient = null }
               }}>
                 <h3 style={{ margin: '0 0 1rem 0' }}>Shopping Cart ({cart.length})</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {cart.map(item => (
-                    <div key={item.produitId} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '0.75rem',
-                      background: 'white',
-                      borderRadius: '6px'
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 500 }}>{item.nom}</div>
-                        <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                          {item.prixUnitaire} DA × 
-                      <input
-                        type="number"
-                        value={item.quantite}
-                        onChange={(e) => updateCartItem(item.produitId, 'quantite', e.target.value)}
-                        onBlur={(e) => {
-                          const v = parseFloat(e.target.value);
-                          if (!isNaN(v)) {
-                            const normalized = item.venduParUnite ? (Math.round(v * 10) / 10).toFixed(1) : Math.floor(v).toString();
-                            updateCartItem(item.produitId, 'quantite', normalized);
-                          }
-                        }}
-                        min={item.venduParUnite ? 0.1 : 1}
-                        max={item.maxQuantite}
-                        step={item.venduParUnite ? 0.1 : 1}
-                        style={{
-                          width: '60px',
-                          margin: '0 0.25rem',
-                          padding: '0.25rem',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px'
-                        }}
-                      />
-                          = {(parseFloat(item.prixUnitaire) * parseFloat(item.quantite)).toFixed(2)} DA
+                  {cart.map(item => {
+                    const product = products.find(p => p.id === item.produitId);
+                    const pricing = computeProductPricing(
+                      product,
+                      item.quantite,
+                      Boolean(item.vendreTotal)
+                    );
+
+                    const unitPrice = Number.isFinite(Number(pricing.prixUnitaire))
+                      ? Number(pricing.prixUnitaire)
+                      : 0;
+
+                    const lineTotal = Number.isFinite(Number(pricing.montant))
+                      ? Number(pricing.montant)
+                      : 0;
+
+                    return (
+                      <div key={item.produitId} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.75rem',
+                        background: 'white',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: 500 }}>{item.nom}</span>
+                            {item.modeVente === ModeVente.BOTH && (
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '0.15rem 0.45rem',
+                                  borderRadius: '999px',
+                                  background: item.vendreTotal ? '#dbeafe' : '#ecfdf5',
+                                  color: item.vendreTotal ? '#1d4ed8' : '#15803d',
+                                  border: `1px solid ${item.vendreTotal ? '#93c5fd' : '#6ee7b7'}`,
+                                  fontWeight: 600
+                                }}
+                              >
+                                {item.vendreTotal ? 'Total' : 'Partiel'}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                            {unitPrice} DA ×
+                            <input
+                              type="number"
+                              value={item.quantite}
+                              onChange={(e) => updateCartItem(item.produitId, 'quantite', e.target.value)}
+                              onBlur={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (!isNaN(v)) {
+                                  const normalized = item.venduParUnite
+                                    ? (Math.round(v * 10) / 10).toFixed(1)
+                                    : Math.floor(v).toString();
+                                  updateCartItem(item.produitId, 'quantite', normalized);
+                                }
+                              }}
+                              min={item.venduParUnite ? 0.1 : 1}
+                              max={item.maxQuantite}
+                              step={item.venduParUnite ? 0.1 : 1}
+                              style={{
+                                width: '60px',
+                                margin: '0 0.25rem',
+                                padding: '0.25rem',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px'
+                              }}
+                            />
+                            = {lineTotal.toFixed(2)} DA
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.produitId)}
+                          style={{
+                            padding: '0.5rem',
+                            background: '#dc2626',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeFromCart(item.produitId)}
-                        style={{
-                          padding: '0.5rem',
-                          background: '#dc2626',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div style={{
                   marginTop: '1rem',

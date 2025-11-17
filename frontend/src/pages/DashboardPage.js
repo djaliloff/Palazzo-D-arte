@@ -118,84 +118,47 @@ const DashboardPage = () => {
   ];
 
   return (
-    <div>
-      <h1 style={{ 
-        margin: 0, 
-        marginBottom: '2rem',
-        fontSize: '2rem', 
-        fontWeight: 700, 
-        color: '#1f2937',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent'
-      }}>
-        Dashboard
-      </h1>
-      
+    <div className="page-section">
+      <header className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+      </header>
+
       {/* Stats Grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '1.5rem',
-        marginBottom: '2rem'
-      }}>
+      <section className="metrics-grid">
         {statsCards.map((stat, idx) => (
-          <div key={idx} style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            borderLeft: `4px solid ${stat.color}`
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+          <article key={idx} className="metric-card" style={{ borderLeftColor: stat.color }}>
+            <div className="metric-card__icon" aria-hidden="true">
               {stat.icon}
             </div>
-            <div style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: 'bold',
-              color: stat.color,
-              marginBottom: '0.25rem'
-            }}>
+            <div className="metric-card__value" style={{ color: stat.color }}>
               {stat.value}
             </div>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>
-              {stat.title}
-            </div>
-          </div>
+            <div className="metric-card__label">{stat.title}</div>
+          </article>
         ))}
-      </div>
+      </section>
 
       {/* Recent Purchases */}
-      <div style={{
-        background: 'white',
-        padding: '1.5rem',
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <h2 style={{ margin: '0 0 1.5rem 0', color: '#333' }}>Recent Purchases</h2>
+      <section className="section-card">
+        <header className="section-card__header">
+          <h2 className="section-card__title">Recent Purchases</h2>
+        </header>
         {recentAchats.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+          <p className="section-card__empty">
             Aucun achat récent
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse',
-              fontSize: '0.9rem'
-            }}>
+          <div className="table-container">
+            <table className="data-table">
               <thead>
-                <tr style={{ 
-                  background: '#f5f5f5',
-                  borderBottom: '2px solid #ddd'
-                }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>BON N°</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>CLIENT</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>TELEPHONE</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>TYPE</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 600 }}>AMOUNT</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>DATE</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>STATUS</th>
+                <tr>
+                  <th>BON N°</th>
+                  <th>CLIENT</th>
+                  <th>TELEPHONE</th>
+                  <th>TYPE</th>
+                  <th className="data-table__cell--numeric">AMOUNT</th>
+                  <th>DATE</th>
+                  <th>STATUS</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,63 +166,34 @@ const DashboardPage = () => {
                   const statusBadge = getStatusBadgeColor(achat.statut);
                   const typeBadge = getClientTypeBadgeColor(achat.client?.type);
                   return (
-                    <tr key={achat.id} style={{ 
-                      borderBottom: '1px solid #eee',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f9f9f9'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                    >
-                      <td style={{ padding: '0.75rem', color: '#333', fontWeight: 500 }}>
+                    <tr key={achat.id}>
+                      <td className="data-table__cell--strong">
                         {achat.numeroBon}
                       </td>
-                      <td style={{ padding: '0.75rem', color: '#333' }}>
+                      <td>
                         {achat.client?.prenom || ''} {achat.client?.nom || ''}
                       </td>
-                      <td style={{ padding: '0.75rem', color: '#666' }}>
+                      <td>
                         {achat.client?.telephone || '—'}
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          fontWeight: 500,
-                          background: typeBadge.bg,
-                          color: typeBadge.color,
-                          display: 'inline-block'
-                        }}>
+                      <td>
+                        <span className="badge" style={{ background: typeBadge.bg, color: typeBadge.color }}>
                           {typeBadge.text}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', color: '#333', fontWeight: 500 }}>
+                      <td className="data-table__cell--numeric data-table__cell--strong">
                         {calculateRealPrice(achat).toFixed(2)} DA
                         {calculateTotalReturns(achat) > 0 && (
-                          <div style={{ 
-                            fontSize: '0.7rem', 
-                            color: '#ef4444',
-                            marginTop: '0.25rem',
-                            textDecoration: 'line-through',
-                            opacity: 0.7,
-                            fontWeight: 'normal'
-                          }}>
+                          <div className="data-table__note">
                             ({parseFloat(achat.prix_total_remise).toFixed(2)} initial)
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem', color: '#666' }}>
+                      <td>
                         {new Date(achat.dateAchat).toLocaleDateString()}
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <span style={{
-                          padding: '0.35rem 0.75rem',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          fontWeight: 500,
-                          background: statusBadge.bg,
-                          color: statusBadge.color,
-                          display: 'inline-block'
-                        }}>
+                      <td>
+                        <span className="badge" style={{ background: statusBadge.bg, color: statusBadge.color }}>
                           {statusBadge.text}
                         </span>
                       </td>
@@ -270,7 +204,7 @@ const DashboardPage = () => {
             </table>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };
